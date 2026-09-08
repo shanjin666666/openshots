@@ -1,7 +1,13 @@
+import { t } from "../lib/i18n";
 import { invoke } from "@tauri-apps/api/core";
 import { save } from "@tauri-apps/plugin-dialog";
 
 export type ExportFormat = "png" | "jpeg" | "webp";
+
+// Keep operation state independent of translated feedback text.
+export type ExportStatus =
+  | { kind: "image" | "project"; path: string }
+  | { kind: "copied" };
 
 export interface PrivacyRegionExport {
   region_type: "blur" | "pixelate";
@@ -36,7 +42,7 @@ export async function exportCanvas(
 ): Promise<string | null> {
   const path = await save({
     defaultPath: `screenshot.${options.format}`,
-    filters: FORMAT_FILTERS[options.format],
+    filters: FORMAT_FILTERS[options.format].map((filter) => ({ ...filter, name: t(filter.name) })),
   });
 
   if (!path) return null;

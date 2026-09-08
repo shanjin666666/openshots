@@ -1,3 +1,4 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 
 interface CountdownOverlayProps {
@@ -16,6 +17,7 @@ export default function CountdownOverlay({
   onComplete,
   onCancel,
 }: CountdownOverlayProps) {
+  useLocale();
   const [remaining, setRemaining] = useState(seconds);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const onCompleteRef = useRef(onComplete);
@@ -103,7 +105,7 @@ export default function CountdownOverlay({
 
       {/* Cancel hint */}
       <p className="absolute bottom-12 text-sm text-white/40">
-        Press Esc to cancel
+        {t("Press Esc to cancel")}
       </p>
     </div>
   );

@@ -223,29 +223,10 @@ pub async fn read_image_file(path: String) -> Result<String, String> {
     Ok(format!("data:{mime};base64,{b64}"))
 }
 
-/// List macOS system wallpaper thumbnails. Returns (name, path) pairs.
+/// Keep the picker thumbnail separate from the full-resolution wallpaper.
 #[tauri::command]
-pub async fn list_system_wallpapers() -> Result<Vec<(String, String)>, String> {
-    let thumb_dir = std::path::Path::new("/System/Library/Desktop Pictures/.thumbnails");
-    if !thumb_dir.exists() {
-        return Ok(Vec::new());
-    }
-
-    let mut wallpapers = Vec::new();
-    let entries = std::fs::read_dir(thumb_dir).map_err(|e| e.to_string())?;
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().map_or(false, |ext| ext == "heic") {
-            let name = path
-                .file_stem()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            wallpapers.push((name, path.to_string_lossy().to_string()));
-        }
-    }
-    wallpapers.sort_by(|a, b| a.0.cmp(&b.0));
-    Ok(wallpapers)
+pub async fn list_system_wallpapers() -> Result<Vec<super::wallpapers::SystemWallpaper>, String> {
+    Ok(super::wallpapers::list())
 }
 
 /// Convert a HEIC file to a small JPEG thumbnail data URL.
@@ -276,9 +257,12 @@ pub async fn convert_heic_thumbnail(path: String) -> Result<String, String> {
 /// Convert a HEIC file to full-size JPEG data URL using macOS sips.
 #[tauri::command]
 pub async fn convert_heic_to_data_url(path: String) -> Result<String, String> {
+    let original = super::wallpapers::resolve_original(&path)?;
     let tmp = std::env::temp_dir().join(format!("wallpaper-{}.jpg", uuid::Uuid::new_v4()));
     let output = std::process::Command::new("sips")
-        .args(["-s", "format", "jpeg", "-s", "formatOptions", "80", &path, "--out"])
+        .args(["-s", "format", "jpeg", "-s", "formatOptions", "95"])
+        .arg(&original)
+        .arg("--out")
         .arg(tmp.as_os_str())
         .output()
         .map_err(|e| format!("Failed to run sips: {e}"))?;

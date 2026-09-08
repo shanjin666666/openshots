@@ -24,6 +24,7 @@ export type CaptureState =
 export type SelfTimerDelay = 0 | 3 | 5 | 10;
 
 interface AppState {
+  batchOpen: boolean;
   isWayland: boolean;
   setWayland: (value: boolean) => void;
 
@@ -59,6 +60,7 @@ interface AppState {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
+      batchOpen: false,
       isWayland: false,
       setWayland: (value) => set({ isWayland: value }),
 

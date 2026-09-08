@@ -1,3 +1,4 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useEffect, useState } from "react";
 import { listWindows, type WindowInfo } from "../../ipc/capture";
 
@@ -7,6 +8,7 @@ interface WindowPickerProps {
 }
 
 export default function WindowPicker({ onSelect, onCancel }: WindowPickerProps) {
+  useLocale();
   const [windows, setWindows] = useState<WindowInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -41,7 +43,7 @@ export default function WindowPicker({ onSelect, onCancel }: WindowPickerProps) 
 
   // Group windows by app
   const grouped = windows.reduce<Record<string, WindowInfo[]>>((acc, w) => {
-    const app = w.app_name || "Other";
+    const app = w.app_name || t("Other");
     if (!acc[app]) acc[app] = [];
     acc[app].push(w);
     return acc;
@@ -60,7 +62,7 @@ export default function WindowPicker({ onSelect, onCancel }: WindowPickerProps) 
       >
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-zinc-800">
           <h2 className="text-[14px] font-medium text-zinc-200">
-            Select Window
+            {t("Select Window")}
           </h2>
           <button
             onClick={onCancel}
@@ -73,7 +75,7 @@ export default function WindowPicker({ onSelect, onCancel }: WindowPickerProps) 
         <div className="max-h-96 overflow-y-auto">
           {loading && (
             <div className="px-5 py-10 text-center text-zinc-500 text-[13px]">
-              <div className="animate-pulse">Scanning windows...</div>
+              <div className="animate-pulse">{t("Scanning windows...")}</div>
             </div>
           )}
 
@@ -85,7 +87,7 @@ export default function WindowPicker({ onSelect, onCancel }: WindowPickerProps) 
 
           {!loading && !error && windows.length === 0 && (
             <div className="px-5 py-10 text-center text-zinc-500 text-[13px]">
-              No capturable windows found
+              {t("No capturable windows found")}
             </div>
           )}
 
@@ -130,7 +132,7 @@ export default function WindowPicker({ onSelect, onCancel }: WindowPickerProps) 
 
         <div className="px-4 py-2.5 border-t border-zinc-800/60 bg-zinc-900/80">
           <p className="text-[11px] text-zinc-600">
-            {windows.length} window{windows.length !== 1 ? "s" : ""} available
+            {windows.length === 1 ? t("One window available") : t("{count} windows available", { count: windows.length })}
           </p>
         </div>
       </div>

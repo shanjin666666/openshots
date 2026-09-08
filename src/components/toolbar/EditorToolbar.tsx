@@ -1,3 +1,4 @@
+import { t, useLocale, getLocale } from "../../lib/i18n";
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
   MousePointer2,
@@ -14,6 +15,8 @@ import {
   Lightbulb,
   Undo2,
   Redo2,
+  Minus,
+  Plus,
 } from "lucide-react";
 import Konva from "konva";
 import data from "@emoji-mart/data";
@@ -22,6 +25,7 @@ import { useToolStore, type ToolMode, COLOR_PRESETS } from "../../stores/tool.st
 import { useCanvasStore } from "../../stores/canvas.store";
 import ToolbarTooltip from "./ToolbarTooltip";
 import ExportPopover from "./ExportPopover";
+import QuickCopyButton from "./QuickCopyButton";
 
 const TOOLS: { mode: ToolMode; icon: React.ElementType; label: string; shortcut: string }[] = [
   { mode: "select", icon: MousePointer2, label: "Select", shortcut: "V" },
@@ -40,9 +44,12 @@ const TOOLS: { mode: ToolMode; icon: React.ElementType; label: string; shortcut:
 
 interface EditorToolbarProps {
   stageRef: React.RefObject<Konva.Stage | null>;
+  zoom: number;
+  setZoom: React.Dispatch<React.SetStateAction<number>>;
 }
 
-export default function EditorToolbar({ stageRef }: EditorToolbarProps) {
+export default function EditorToolbar({ stageRef, zoom, setZoom }: EditorToolbarProps) {
+  useLocale();
   const activeTool = useToolStore((s) => s.activeTool);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
   const strokeColor = useToolStore((s) => s.strokeColor);
@@ -119,102 +126,129 @@ export default function EditorToolbar({ stageRef }: EditorToolbarProps) {
   };
 
   return (
-    <div className="h-11 flex items-center gap-1 px-3 border-b border-zinc-800/60 bg-zinc-950 shrink-0">
-      {/* Tool icons */}
-      {TOOLS.map(({ mode, icon: Icon, label, shortcut }) => (
-        <ToolbarTooltip key={mode} label={label} shortcut={shortcut}>
-          <div className="relative">
-            <button
-              onClick={() => handleToolClick(mode)}
-              className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors duration-150 ${
-                activeTool === mode
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60"
-              }`}
-            >
-              <Icon size={20} />
-            </button>
+    <div aria-label={t("Editor toolbar")} className="min-h-11 flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-1.5 border-b border-zinc-800/60 bg-zinc-950 shrink-0">
+      <div className="flex flex-wrap items-center gap-1">
+        {/* Tool icons */}
+        {TOOLS.map(({ mode, icon: Icon, label, shortcut }) => (
+          <ToolbarTooltip key={mode} label={t(label)} shortcut={shortcut}>
+            <div className="relative">
+              <button
+                aria-label={t(label)}
+                onClick={() => handleToolClick(mode)}
+                className={`w-8 h-8 flex items-center justify-center rounded-md transition-colors duration-150 ${
+                  activeTool === mode
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60"
+                }`}
+              >
+                <Icon size={20} />
+              </button>
 
-            {/* Emoji picker anchored below emoji button */}
-            {mode === "emoji" && showEmojiPicker && (
-              <div ref={emojiRef} className="absolute top-full left-0 mt-2 z-50">
-                <Picker
-                  data={data}
-                  onEmojiSelect={handleEmojiSelect}
-                  theme="dark"
-                  previewPosition="none"
-                  skinTonePosition="none"
-                  maxFrequentRows={2}
-                  perLine={7}
-                />
-              </div>
-            )}
-          </div>
-        </ToolbarTooltip>
-      ))}
-
-      {/* Separator */}
-      <div className="w-px h-5 bg-zinc-700/50 mx-1" />
-
-      {/* Color picker dots */}
-      <div className="flex items-center gap-0.5">
-        {COLOR_PRESETS.map((color) => (
-          <button
-            key={color}
-            onClick={() => handleColorClick(color)}
-            className={`w-5 h-5 rounded-full transition-all duration-150 ${
-              strokeColor === color
-                ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-950"
-                : "hover:scale-110"
-            }`}
-            style={{ backgroundColor: color }}
-          />
+              {/* Emoji picker anchored below emoji button */}
+              {mode === "emoji" && showEmojiPicker && (
+                <div ref={emojiRef} className="absolute top-full left-0 mt-2 z-50">
+                  <Picker
+                    data={data}
+                    locale={getLocale() === "zh-CN" ? "zh" : "en"}
+                    onEmojiSelect={handleEmojiSelect}
+                    theme="dark"
+                    previewPosition="none"
+                    skinTonePosition="none"
+                    maxFrequentRows={2}
+                    perLine={7}
+                  />
+                </div>
+              )}
+            </div>
+          </ToolbarTooltip>
         ))}
+
+        {/* Separator */}
+        <div className="w-px h-5 bg-zinc-700/50 mx-1" />
+
+        {/* Color picker dots */}
+        <div className="flex items-center gap-0.5">
+          {COLOR_PRESETS.map((color) => (
+            <button
+              key={color}
+              onClick={() => handleColorClick(color)}
+              className={`w-5 h-5 rounded-full transition-all duration-150 ${
+                strokeColor === color
+                  ? "ring-2 ring-white ring-offset-1 ring-offset-zinc-950"
+                  : "hover:scale-110"
+              }`}
+              style={{ backgroundColor: color }}
+            />
+          ))}
+        </div>
+
       </div>
 
-      {/* Separator */}
-      <div className="w-px h-5 bg-zinc-700/50 mx-1" />
+      <div className="ml-auto flex shrink-0 items-center gap-1">
 
-      {/* Undo / Redo */}
-      <ToolbarTooltip label="Undo" shortcut="Cmd+Z">
-        <button
-          onClick={undo}
-          className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors duration-150"
-        >
-          <Undo2 size={20} />
-        </button>
-      </ToolbarTooltip>
-      <ToolbarTooltip label="Redo" shortcut="Cmd+Shift+Z">
-        <button
-          onClick={redo}
-          className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors duration-150"
-        >
-          <Redo2 size={20} />
-        </button>
-      </ToolbarTooltip>
+        {/* Undo / Redo */}
+        <ToolbarTooltip label={t("Undo")} shortcut="Cmd+Z">
+          <button
+            aria-label={t("Undo (Cmd+Z)")}
+            onClick={undo}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors duration-150"
+          >
+            <Undo2 size={20} />
+          </button>
+        </ToolbarTooltip>
+        <ToolbarTooltip label={t("Redo")} shortcut="Cmd+Shift+Z">
+          <button
+            aria-label={t("Redo (Cmd+Shift+Z)")}
+            onClick={redo}
+            className="w-8 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 transition-colors duration-150"
+          >
+            <Redo2 size={20} />
+          </button>
+        </ToolbarTooltip>
 
-      {/* Spacer */}
-      <div className="flex-1" />
+        <div className="w-px h-5 bg-zinc-700/50 mx-1" />
 
-      {/* Done button */}
-      <div className="relative">
-        <button
-          ref={doneRef}
-          data-done-trigger
-          onClick={() => setShowExport(!showExport)}
-          className="px-4 py-1.5 text-[13px] font-medium rounded-full bg-zinc-100 text-zinc-900 hover:bg-white transition-colors duration-150"
-        >
-          Done
-        </button>
+        <div className="flex items-center" role="group" aria-label={t("Canvas zoom")}>
+          <button type="button" aria-label={t("Zoom out")} title={t("Zoom out")} disabled={zoom <= 0.25}
+            onClick={() => setZoom((value) => Math.max(value * 0.8, 0.25))}
+            className="w-7 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 disabled:opacity-30">
+            <Minus size={16} />
+          </button>
+          <button type="button" title={t("Reset zoom (Cmd+0)")} aria-label={t("Reset zoom (Cmd+0)")}
+            onClick={() => setZoom(1)}
+            className="min-w-12 h-8 px-1 rounded-md text-xs tabular-nums text-zinc-300 hover:bg-zinc-800/60">
+            {Math.round(zoom * 100)}%
+          </button>
+          <button type="button" aria-label={t("Zoom in")} title={t("Zoom in")} disabled={zoom >= 4}
+            onClick={() => setZoom((value) => Math.min(value * 1.2, 4))}
+            className="w-7 h-8 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800/60 disabled:opacity-30">
+            <Plus size={16} />
+          </button>
+        </div>
 
-        {/* Export popover */}
-        {showExport && (
-          <ExportPopover
-            stageRef={stageRef}
-            anchorEl={doneRef.current}
-            onClose={() => setShowExport(false)}
-          />
-        )}
+        <div className="w-px h-5 bg-zinc-700/50 mx-1" />
+        <QuickCopyButton stageRef={stageRef} />
+
+        {/* Done button */}
+        <div className="relative ml-2">
+          <button
+            ref={doneRef}
+            data-done-trigger
+            onClick={() => setShowExport(!showExport)}
+            className="px-4 py-1.5 text-[13px] font-medium rounded-full bg-zinc-100 text-zinc-900 hover:bg-white transition-colors duration-150"
+          >
+            {t("Done")}
+          </button>
+
+          {/* Export popover */}
+          {showExport && (
+            <ExportPopover
+              stageRef={stageRef}
+              anchorEl={doneRef.current}
+              onClose={() => setShowExport(false)}
+            />
+          )}
+        </div>
       </div>
     </div>
   );

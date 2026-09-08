@@ -1,3 +1,5 @@
+import { t } from "./i18n";
+import { readImageLayout, type ImageLayoutSettings } from "./image-layout";
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { open, save, ask } from "@tauri-apps/plugin-dialog";
@@ -26,6 +28,7 @@ export interface ProjectFile {
     height: number;
     padding: number;
     background: CanvasBackground;
+    imageLayout?: ImageLayoutSettings | null;
   };
   images: CanvasImage[];
   annotations: AnnotationShape[];
@@ -51,6 +54,7 @@ export function serializeProject(): ProjectFile {
       height: state.canvasHeight,
       padding: state.padding,
       background: state.background,
+      imageLayout: state.imageLayout,
     },
     images: state.images,
     annotations: state.annotations,
@@ -127,8 +131,8 @@ export async function saveProject(): Promise<string | null> {
   const json = JSON.stringify(project, null, 2);
 
   const path = await save({
-    defaultPath: "Untitled.openshots",
-    filters: [{ name: "OpenShots Project", extensions: ["openshots"] }],
+    defaultPath: t("Untitled.openshots"),
+    filters: [{ name: t("OpenShots Project"), extensions: ["openshots"] }],
   });
 
   if (!path) return null;
@@ -200,6 +204,7 @@ export function loadProject(projectFile: ProjectFile, filePath: string): void {
     padding: projectFile.canvas.padding,
     background: projectFile.canvas.background,
     images: projectFile.images,
+    imageLayout: readImageLayout(projectFile.canvas.imageLayout),
     annotations: projectFile.annotations,
     privacyRegions: projectFile.privacyRegions,
     selectedId: null,
@@ -225,8 +230,8 @@ export async function confirmDiscardChanges(): Promise<boolean> {
   if (!isDirty) return true;
 
   const shouldSave = await ask(
-    "You have unsaved changes. Do you want to save before continuing?",
-    { title: "Unsaved Changes", kind: "warning" },
+    t("You have unsaved changes. Do you want to save before continuing?"),
+    { title: t("Unsaved Changes"), kind: "warning", okLabel: t("Yes"), cancelLabel: t("No") },
   );
 
   if (shouldSave) {
@@ -252,7 +257,7 @@ export async function openProject(): Promise<void> {
 
   const filePath = await open({
     multiple: false,
-    filters: [{ name: "OpenShots Project", extensions: ["openshots"] }],
+    filters: [{ name: t("OpenShots Project"), extensions: ["openshots"] }],
   });
 
   if (!filePath) return;

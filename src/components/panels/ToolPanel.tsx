@@ -1,3 +1,4 @@
+import { t, useLocale, getLocale } from "../../lib/i18n";
 import { useState, useRef, useEffect } from "react";
 import { useToolStore, type ToolMode, COLOR_PRESETS } from "../../stores/tool.store";
 import { useCanvasStore } from "../../stores/canvas.store";
@@ -20,6 +21,7 @@ const TOOLS: { mode: ToolMode; label: string; shortcut: string }[] = [
 ];
 
 export default function ToolPanel() {
+  useLocale();
   const activeTool = useToolStore((s) => s.activeTool);
   const setActiveTool = useToolStore((s) => s.setActiveTool);
   const strokeColor = useToolStore((s) => s.strokeColor);
@@ -93,7 +95,7 @@ export default function ToolPanel() {
     <div className="space-y-4">
       <div className="space-y-2">
         <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-          Tools
+          {t("Tools")}
         </h3>
         <div className="grid grid-cols-2 gap-1">
           {TOOLS.map(({ mode, label, shortcut }) => (
@@ -106,7 +108,7 @@ export default function ToolPanel() {
                   : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/60"
               }`}
             >
-              <span>{label}</span>
+              <span>{t(label)}</span>
               <span className="text-[10px] opacity-40">{shortcut}</span>
             </button>
           ))}
@@ -118,6 +120,7 @@ export default function ToolPanel() {
             <div className="absolute left-0 top-0">
               <Picker
                 data={data}
+                locale={getLocale() === "zh-CN" ? "zh" : "en"}
                 onEmojiSelect={handleEmojiSelect}
                 theme="dark"
                 previewPosition="none"
@@ -133,7 +136,7 @@ export default function ToolPanel() {
       {/* Color presets */}
       <div className="space-y-2">
         <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-          Color
+          {t("Color")}
         </h3>
         <div className="flex flex-wrap gap-1">
           {COLOR_PRESETS.map((color) => (

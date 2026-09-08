@@ -31,7 +31,7 @@ pub async fn show_capture_preview(app: AppHandle, image_data_url: String) -> Res
         label,
         tauri::WebviewUrl::App("index-preview.html".into()),
     )
-    .title("OpenShots Preview")
+    .title(crate::i18n::text(&app, "OpenShots Preview", "OpenShots 预览"))
     .inner_size(220.0, 170.0)
     .position(pos_x as f64, pos_y as f64)
     .decorations(false)

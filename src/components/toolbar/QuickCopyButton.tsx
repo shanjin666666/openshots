@@ -1,14 +1,16 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useState, useCallback } from "react";
 import { Copy, Check } from "lucide-react";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
 import { Image } from "@tauri-apps/api/image";
 import Konva from "konva";
 
-interface DragBarProps {
+interface QuickCopyButtonProps {
   stageRef: React.RefObject<Konva.Stage | null>;
 }
 
-export default function DragBar({ stageRef }: DragBarProps) {
+export default function QuickCopyButton({ stageRef }: QuickCopyButtonProps) {
+  useLocale();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = useCallback(async () => {
@@ -35,15 +37,15 @@ export default function DragBar({ stageRef }: DragBarProps) {
   return (
     <button
       onClick={() => void handleCopy()}
-      className="fixed bottom-14 left-1/2 -translate-x-1/2 z-10 flex items-center gap-2 bg-zinc-800/90 border border-zinc-700/60 rounded-lg backdrop-blur-sm px-4 py-2 select-none hover:bg-zinc-700/90 transition-colors cursor-pointer"
+      className="h-8 shrink-0 flex items-center gap-1.5 rounded-md bg-zinc-800/80 px-3 select-none hover:bg-zinc-700 transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
     >
       {copied ? (
         <Check className="w-4 h-4 text-emerald-400" />
       ) : (
         <Copy className="w-4 h-4 text-zinc-500" />
       )}
-      <span className="text-[13px] text-zinc-400">
-        {copied ? "Copied!" : "Quick Copy"}
+      <span className="text-[13px] text-zinc-300 whitespace-nowrap" aria-live="polite">
+        {copied ? t("Copied!") : t("Quick Copy")}
       </span>
     </button>
   );

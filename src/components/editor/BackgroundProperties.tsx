@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState, useCallback } from "react";
+import { t, useLocale } from "../../lib/i18n";
+import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { usePresetStore, type CanvasPreset } from "../../stores/preset.store";
 import { ASPECT_RATIOS, canvasSize } from "../../lib/aspectRatios";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl } from "../../ipc/capture";
-import { ChevronDown, ChevronRight, GripHorizontal } from "lucide-react";
+import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl, type SystemWallpaper } from "../../ipc/capture";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { BUILTIN_IMAGE_PRESETS } from "../../lib/builtin-image-presets";
 
 // macOS-style vibrant gradients
 const GRADIENT_PRESETS: [string, string][] = [
@@ -35,16 +37,12 @@ const SOLID_PRESETS = [
 
 type BgType = "solid" | "linear-gradient" | "radial-gradient" | "image";
 
-interface BackgroundPopoverProps {
-  position: { x: number; y: number };
-  onClose: () => void;
-}
-
 function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
       <button
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 w-full text-left text-[11px] font-medium text-zinc-400 tracking-wide hover:text-zinc-200 transition-colors"
       >
@@ -56,31 +54,8 @@ function Section({ title, defaultOpen = true, children }: { title: string; defau
   );
 }
 
-export default function BackgroundPopover({ position, onClose }: BackgroundPopoverProps) {
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
-
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const offsetX = dragOffset.x;
-    const offsetY = dragOffset.y;
-
-    const onMove = (ev: MouseEvent) => {
-      setDragOffset({
-        x: offsetX + (ev.clientX - startX),
-        y: offsetY + (ev.clientY - startY),
-      });
-    };
-    const onUp = () => {
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }, [dragOffset]);
-
+export default function BackgroundProperties({ active }: { active: boolean }) {
+  useLocale();
   const background = useCanvasStore((s) => s.background);
   const setBackground = useCanvasStore((s) => s.setBackground);
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
@@ -93,46 +68,28 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
   const addPreset = usePresetStore((s) => s.addPreset);
   const removePreset = usePresetStore((s) => s.removePreset);
 
-  const [wallpapers, setWallpapers] = useState<{ name: string; path: string; thumb?: string }[]>([]);
+  const [wallpapers, setWallpapers] = useState<(SystemWallpaper & { thumb?: string })[]>([]);
   const [loadingWp, setLoadingWp] = useState<string | null>(null);
+  const [wallpaperError, setWallpaperError] = useState("");
+  const [backgroundSize, setBackgroundSize] = useState<{ src: string; width: number; height: number } | null>(null);
+
+  useEffect(() => { setWallpaperError(""); }, [background.imageSrc]);
   const [widthInput, setWidthInput] = useState(String(canvasWidth));
   const [heightInput, setHeightInput] = useState(String(canvasHeight));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Animate in
-  useEffect(() => {
-    requestAnimationFrame(() => setVisible(true));
-  }, []);
-
   // Sync dimension inputs with store
-  useEffect(() => { setWidthInput(String(canvasWidth)); }, [canvasWidth]);
-  useEffect(() => { setHeightInput(String(canvasHeight)); }, [canvasHeight]);
-
-  // Close on outside click
   useEffect(() => {
-    const handleClick = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        onClose();
-      }
-    };
-    document.addEventListener("mousedown", handleClick);
-    return () => document.removeEventListener("mousedown", handleClick);
-  }, [onClose]);
+    setWidthInput(String(canvasWidth));
+    setHeightInput(String(canvasHeight));
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [canvasWidth, canvasHeight]);
 
-  // Close on escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, [onClose]);
-
-  // Clamp position to viewport
-  const popW = 288; // w-72
-  const popH = 500; // approximate max height
-  const x = Math.min(position.x, window.innerWidth - popW - 16);
-  const y = Math.min(position.y, window.innerHeight - popH - 16);
+  const resizeCanvas = (width: number, height: number) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setCanvasSize(width, height);
+  };
 
   const handleDimensionChange = (newW: string, newH: string) => {
     setWidthInput(newW);
@@ -141,22 +98,22 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
     debounceRef.current = setTimeout(() => {
       const w = Math.min(Math.max(Number(newW) || 100, 100), 4000);
       const h = Math.min(Math.max(Number(newH) || 100, 100), 4000);
-      setCanvasSize(w, h);
+      resizeCanvas(w, h);
     }, 300);
   };
 
   // Load wallpapers when image tab selected
   useEffect(() => {
-    if (background.type === "image" && wallpapers.length === 0) {
+    if (active && background.type === "image" && wallpapers.length === 0) {
       listSystemWallpapers()
         .then(async (wp) => {
-          const items = wp.map(([name, path]: [string, string]) => ({ name, path }));
+          const items = wp;
           setWallpapers(items);
           for (let i = 0; i < items.length; i += 4) {
             const batch = items.slice(i, i + 4);
             const results = await Promise.allSettled(
               batch.map(async (item) => {
-                const thumb = await convertHeicThumbnail(item.path);
+                const thumb = await convertHeicThumbnail(item.thumbnailPath);
                 return { path: item.path, thumb };
               }),
             );
@@ -175,15 +132,23 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
         })
         .catch(() => {});
     }
-  }, [background.type, wallpapers.length]);
+  }, [active, background.type, wallpapers.length]);
 
   const handleSelectWallpaper = async (path: string) => {
     setLoadingWp(path);
+    setWallpaperError("");
+    const previousBackground = useCanvasStore.getState().background;
     try {
       const dataUrl = await convertHeicToDataUrl(path);
-      setBackground({ type: "image", imageSrc: dataUrl });
+      setWallpapers((items) => items.map((wp) => wp.path === path ? { ...wp, available: true } : wp));
+      if (useCanvasStore.getState().background === previousBackground) {
+        setBackground({ type: "image", imageSrc: dataUrl });
+      }
     } catch (err) {
       console.error("Failed to load wallpaper:", err);
+      setWallpaperError(String(err).includes("WALLPAPER_ORIGINAL_NOT_AVAILABLE")
+        ? "Download this wallpaper in macOS System Settings → Wallpaper, then select it again."
+        : "Unable to load the full-resolution wallpaper. Please try again.");
     } finally {
       setLoadingWp(null);
     }
@@ -193,7 +158,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
     try {
       const filePath = await open({
         multiple: false,
-        filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp"] }],
+        filters: [{ name: t("Images"), extensions: ["png", "jpg", "jpeg", "webp"] }],
       });
       if (filePath) {
         const dataUrl = await readImageFile(filePath as string);
@@ -205,10 +170,10 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
   };
 
   const types: { value: BgType; label: string }[] = [
-    { value: "solid", label: "Solid" },
-    { value: "linear-gradient", label: "Linear" },
-    { value: "radial-gradient", label: "Radial" },
-    { value: "image", label: "Custom" },
+    { value: "solid", label: t("Solid") },
+    { value: "linear-gradient", label: t("Linear") },
+    { value: "radial-gradient", label: t("Radial") },
+    { value: "image", label: t("Custom") },
   ];
 
   const isGradient = background.type === "linear-gradient" || background.type === "radial-gradient";
@@ -217,7 +182,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
   // Preset save handler
   const handleSavePreset = () => {
     const state = useCanvasStore.getState();
-    const name = `Preset ${presets.length + 1}`;
+    const name = t("Preset {count}", { count: presets.length + 1 });
     const firstImage = state.images[0];
     const preset: CanvasPreset = {
       id: crypto.randomUUID(),
@@ -236,7 +201,8 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
     addPreset(preset);
   };
 
-  const handleApplyPreset = (preset: CanvasPreset) => {
+  const handleApplyPreset = (preset: Omit<CanvasPreset, "id">) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
     const store = useCanvasStore.getState();
     store.setCanvasSize(preset.canvasWidth, preset.canvasHeight);
     store.setPadding(preset.padding);
@@ -261,23 +227,24 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
   };
 
   return (
-    <div
-      ref={popoverRef}
-      className={`fixed z-50 w-72 max-h-[80vh] overflow-y-auto bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl p-4 space-y-4 transition-all duration-150 ${
-        visible ? "opacity-100 scale-100" : "opacity-0 scale-95"
-      }`}
-      style={{ left: Math.max(8, x) + dragOffset.x, top: Math.max(8, y) + dragOffset.y }}
-    >
-      {/* Drag handle */}
-      <div
-        onMouseDown={handleDragStart}
-        className="flex items-center justify-center cursor-grab active:cursor-grabbing -mt-1 mb-2"
-      >
-        <GripHorizontal size={14} className="text-zinc-600" />
-      </div>
-
+    <div className="p-4 space-y-5">
       {/* Section 1: Background */}
-      <Section title="Background" defaultOpen>
+      <Section title={t("Background")} defaultOpen>
+        <div>
+          <p className="text-[11px] text-zinc-500 mb-2">{t("Built-in backgrounds")}</p>
+          <div className="grid grid-cols-2 gap-2">
+            {BUILTIN_IMAGE_PRESETS.map((preset) => (
+              <button key={preset.name} type="button" aria-label={t(preset.name)}
+                aria-pressed={background.type === "image" && background.imageSrc === preset.background.imageSrc}
+                onClick={() => setBackground(structuredClone(preset.background))}
+                className={`overflow-hidden rounded-lg border text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 ${background.type === "image" && background.imageSrc === preset.background.imageSrc ? "border-blue-400" : "border-zinc-700/60 hover:border-zinc-500"}`}>
+                <img src={preset.background.imageSrc!} alt="" className="h-14 w-full object-cover" />
+                <span className="block px-2 py-1.5 text-xs text-zinc-300">{t(preset.name)}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Type selector */}
         <div className="flex gap-1 flex-wrap">
           {types.map(({ value, label }) => (
@@ -302,17 +269,26 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
               onClick={() => void handleUploadBg()}
               className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150"
             >
-              {background.imageSrc ? "Change image" : "Upload image"}
+              {background.imageSrc ? t("Change image") : t("Upload image")}
             </button>
             {background.imageSrc && (
-              <div
-                className="h-16 rounded-md border border-zinc-700/50 bg-cover bg-center"
-                style={{ backgroundImage: `url(${background.imageSrc})` }}
-              />
+              <div className="space-y-1.5">
+                <img src={background.imageSrc} alt={t("Background")}
+                  className="h-16 w-full rounded-md border border-zinc-700/50 object-cover"
+                  onLoad={(event) => {
+                    const image = event.currentTarget;
+                    setBackgroundSize({ src: image.src, width: image.naturalWidth, height: image.naturalHeight });
+                  }} />
+                {backgroundSize?.src === background.imageSrc && <div className="text-[11px] text-zinc-500">
+                  {t("Background image: {width} × {height} px", backgroundSize)}
+                  {(backgroundSize.width < canvasWidth || backgroundSize.height < canvasHeight) &&
+                    <p className="mt-1 text-amber-300">{t("This background is smaller than the canvas. Choose a higher-resolution original to avoid blur.")}</p>}
+                </div>}
+              </div>
             )}
             {wallpapers.length > 0 && (
               <div>
-                <p className="text-[11px] text-zinc-500 mb-2">System Wallpapers</p>
+                <p className="text-[11px] text-zinc-500 mb-2">{t("System Wallpapers")}</p>
                 <div className="grid grid-cols-3 gap-1 max-h-36 overflow-y-auto pr-0.5">
                   {wallpapers.map((wp) => (
                     <button
@@ -324,7 +300,8 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
                           ? "border-zinc-400 opacity-70"
                           : "border-zinc-700/40 hover:border-zinc-400"
                       }`}
-                      title={wp.name}
+                      title={wp.available ? wp.name : `${wp.name} · ${t("Not downloaded")}`}
+                      aria-label={wp.available ? wp.name : `${wp.name} · ${t("Not downloaded")}`}
                     >
                       {wp.thumb ? (
                         <img src={wp.thumb} alt={wp.name} className="absolute inset-0 w-full h-full object-cover" />
@@ -335,9 +312,10 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
                           </span>
                         </div>
                       )}
+                      {!wp.available && <span className="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] text-zinc-200 text-center">{t("Not downloaded")}</span>}
                       {loadingWp === wp.path && (
                         <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                          <span className="text-[10px] text-white animate-pulse">Loading</span>
+                          <span className="text-[10px] text-white animate-pulse">{t("Loading")}</span>
                         </div>
                       )}
                     </button>
@@ -345,6 +323,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
                 </div>
               </div>
             )}
+            {wallpaperError && <p role="alert" className="text-xs text-amber-300">{t(wallpaperError)}</p>}
           </div>
         )}
 
@@ -379,7 +358,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
         {/* Custom color input */}
         {background.type !== "image" && (
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-zinc-500">Color</label>
+            <label className="text-[11px] text-zinc-500">{t("Color")}</label>
             <input
               type="color"
               value={background.type === "solid" ? background.color : background.gradientColors[0]}
@@ -406,7 +385,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
         {/* Gradient angle */}
         {isGradient && (
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-zinc-500 w-12">Angle</label>
+            <label className="text-[11px] text-zinc-500 w-12">{t("Angle")}</label>
             <input
               type="range"
               min={0}
@@ -421,7 +400,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
 
         {/* Blur */}
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Blur</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Blur")}</label>
           <input
             type="range"
             min={0}
@@ -435,7 +414,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
 
         {/* Grain */}
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Grain</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Grain")}</label>
           <input
             type="range"
             min={0}
@@ -449,7 +428,8 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
       </Section>
 
       {/* Section 2: Canvas Size */}
-      <Section title="Canvas Size" defaultOpen>
+      <Section title={t("Canvas Size")} defaultOpen>
+        <p className="text-[11px] leading-relaxed text-zinc-500">{t("Images automatically fit when the canvas size or aspect ratio changes.")}</p>
         {/* Aspect ratio buttons */}
         <div className="grid grid-cols-3 gap-1">
           {ASPECT_RATIOS.map((preset) => {
@@ -458,7 +438,7 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
             return (
               <button
                 key={preset.label}
-                onClick={() => setCanvasSize(size.width, size.height)}
+                onClick={() => resizeCanvas(size.width, size.height)}
                 className={`px-2 py-1.5 text-[12px] rounded-md transition-colors duration-150 ${
                   isActive
                     ? "bg-zinc-100 text-zinc-900"
@@ -473,29 +453,31 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
 
         {/* W/H inputs */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-zinc-500 w-6 shrink-0">W</span>
+          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Width")}</span>
           <input
             type="number"
             min={100}
             max={4000}
+            aria-label={t("Width")}
             value={widthInput}
             onChange={(e) => handleDimensionChange(e.target.value, heightInput)}
-            className="w-full px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
+            className="w-full min-w-0 px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
           />
-          <span className="text-[11px] text-zinc-500 w-6 shrink-0">H</span>
+          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Height")}</span>
           <input
             type="number"
             min={100}
             max={4000}
+            aria-label={t("Height")}
             value={heightInput}
             onChange={(e) => handleDimensionChange(widthInput, e.target.value)}
-            className="w-full px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
+            className="w-full min-w-0 px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
           />
         </div>
 
         {/* Padding */}
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Padding</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Padding")}</label>
           <input
             type="range"
             min={0}
@@ -509,16 +491,22 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
       </Section>
 
       {/* Section 3: Presets */}
-      <Section title="Presets" defaultOpen={false}>
+      <Section title={t("Presets")} defaultOpen={false}>
+        <p className="text-[11px] text-zinc-500">{t("Built-in presets")}</p>
+        {BUILTIN_IMAGE_PRESETS.map((preset) => <button key={preset.name} onClick={() => handleApplyPreset(preset)}
+          className="w-full flex items-center gap-2 rounded-md bg-zinc-800/40 p-2 text-left text-[13px] text-zinc-300 hover:bg-zinc-800">
+          <img src={preset.background.imageSrc!} alt="" className="w-10 h-7 object-cover rounded" />{t(preset.name)}
+        </button>)}
+        <p className="text-[11px] text-zinc-500">{t("Saved presets")}</p>
         <button
           onClick={handleSavePreset}
           className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150"
         >
-          Save Current as Preset
+          {t("Save Current as Preset")}
         </button>
 
         {presets.length === 0 && (
-          <p className="text-[11px] text-zinc-500">No saved presets</p>
+          <p className="text-[11px] text-zinc-500">{t("No saved presets")}</p>
         )}
 
         <div className="space-y-1">
@@ -531,7 +519,9 @@ export default function BackgroundPopover({ position, onClose }: BackgroundPopov
                 className="w-5 h-4 rounded-sm shrink-0 border border-zinc-700/50"
                 style={{
                   background:
-                    preset.background.type === "solid"
+                    preset.background.type === "image" && preset.background.imageSrc
+                      ? `center / cover url(${preset.background.imageSrc})`
+                      : preset.background.type === "solid"
                       ? preset.background.color
                       : `linear-gradient(${preset.background.gradientAngle}deg, ${preset.background.gradientColors[0]}, ${preset.background.gradientColors[1]})`,
                 }}

@@ -98,6 +98,26 @@ npx tauri build
 - **Tailwind CSS v4** — Styling
 - **xcap** — Cross-platform screen capture
 
+## Batch beautification
+
+Open **Batch beautify** (批量美化), add multiple PNG/JPEG/WebP/BMP images, then choose a style and an output folder. Each source becomes a separate PNG or high-quality JPEG. Preview any item before exporting; the preview uses the same rendering path as the full-size output.
+
+- Apply a built-in/saved preset or copy the editor's background, padding, corners, shadow and border.
+- Keep each original image's pixel dimensions plus padding, or fit every image to a fixed canvas. Choose one of nine positions and adjust image size without stretching or cropping.
+- Files are named `original-styled.png` (or `.jpg`), with numeric suffixes on collisions. Originals and existing files are never overwritten.
+- Processing is sequential to limit memory use. Stop between images, inspect individual failures, and retry failed items. Successfully written images are retained when stopping.
+- Each output is limited to 32 megapixels and 8192 pixels per side. Batch settings and file selections are retained while navigating within the current app session.
+
+Validation: `npx vitest run src/lib/batch` and `cargo test --manifest-path src-tauri/Cargo.toml --lib commands::batch::tests`.
+
+## Interface language
+
+Open **Settings → Language** (设置 → 语言) to switch between **简体中文** and **English**. Changes apply immediately and are remembered after restarting. Simplified Chinese is the default. Changing language does not alter screenshot content, project names, presets, or keyboard shortcuts.
+
+Frontend messages live in `src/lib/i18n/messages.ts`. Use `t()` for messages and `useLocale()` in components that display them. English source messages are the fallback keys. Translate static tool registries at render time, and store status codes rather than translated strings. Native application/tray menus are synchronized through `src-tauri/src/i18n.rs`.
+
+Run language-layer checks with `npx vitest run src/lib/i18n/i18n.test.ts` and the frontend build with `npm run build`. Native menu changes also require desktop verification with `npx tauri dev`.
+
 ## Keyboard Shortcuts
 
 | Action | macOS | Windows/Linux |

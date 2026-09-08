@@ -53,11 +53,16 @@ export async function checkScreenPermission(): Promise<boolean> {
   return invoke<boolean>("check_screen_permission");
 }
 
-/**
- * List macOS system wallpaper thumbnails. Returns [name, path] pairs.
- */
-export async function listSystemWallpapers(): Promise<[string, string][]> {
-  return invoke<[string, string][]>("list_system_wallpapers");
+export interface SystemWallpaper {
+  name: string;
+  path: string;
+  thumbnailPath: string;
+  available: boolean;
+}
+
+/** Separate picker thumbnails from full-resolution wallpaper sources. */
+export async function listSystemWallpapers(): Promise<SystemWallpaper[]> {
+  return invoke<SystemWallpaper[]>("list_system_wallpapers");
 }
 
 /**

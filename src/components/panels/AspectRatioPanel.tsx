@@ -1,7 +1,9 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { ASPECT_RATIOS, canvasSize } from "../../lib/aspectRatios";
 
 export default function AspectRatioPanel() {
+  useLocale();
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const setCanvasSize = useCanvasStore((s) => s.setCanvasSize);
@@ -11,8 +13,9 @@ export default function AspectRatioPanel() {
   return (
     <div className="space-y-2">
       <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        Canvas Size
+        {t("Canvas Size")}
       </h3>
+      <p className="text-[11px] leading-relaxed text-zinc-500">{t("Images automatically fit when the canvas size or aspect ratio changes.")}</p>
       <div className="grid grid-cols-3 gap-1">
         {ASPECT_RATIOS.map((preset) => {
           const size = canvasSize(preset);

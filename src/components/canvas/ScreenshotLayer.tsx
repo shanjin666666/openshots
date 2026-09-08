@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Layer } from "react-konva";
 import { useCanvasStore } from "../../stores/canvas.store";
-import { WINDOW_CHROME_FRAMES, DEVICE_MOCKUP_FRAMES } from "../composition/frames";
+import { imageDisplaySize, imageFrameSize } from "../../lib/image-geometry";
 import ScreenshotNode from "./nodes/ScreenshotNode";
 import GuidesLayer, { type Guide } from "./GuidesLayer";
 
@@ -18,47 +18,12 @@ export default function ScreenshotLayer() {
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const [guides, setGuides] = useState<Guide[]>([]);
 
-  const availW = Math.max(canvasWidth - padding * 2, 100);
-  const availH = Math.max(canvasHeight - padding * 2, 100);
-
   return (
     <>
       <Layer>
         {images.map((img) => {
-          // If user manually resized, use their dimensions as-is
-          // Otherwise, contain-fit using natural dimensions (padding works)
-          let displayW: number;
-          let displayH: number;
-          if (img.userResized) {
-            displayW = img.width;
-            displayH = img.height;
-          } else {
-            const fitScale = Math.min(availW / img.width, availH / img.height);
-            displayW = Math.round(img.width * fitScale);
-            displayH = Math.round(img.height * fitScale);
-          }
-
-          // Calculate extra height from window chrome frames
-          const frameVariant = img.frame?.variant;
-          const frameCategory = img.frame?.type;
-          let chromeHeight = 0;
-          if (frameCategory === "window-chrome" && (frameVariant === "macos" || frameVariant === "windows")) {
-            chromeHeight = WINDOW_CHROME_FRAMES[frameVariant].titleBarHeight;
-          }
-
-          // Calculate device mockup insets
-          let deviceInsets: { top: number; right: number; bottom: number; left: number } | null = null;
-          if (frameCategory === "device-mockup" && (frameVariant === "iphone" || frameVariant === "ipad" || frameVariant === "macbook")) {
-            const mockupConfig = DEVICE_MOCKUP_FRAMES[frameVariant];
-            const totalW = displayW / (1 - mockupConfig.screenInset.left - mockupConfig.screenInset.right);
-            const totalH = displayH / (1 - mockupConfig.screenInset.top - mockupConfig.screenInset.bottom);
-            deviceInsets = {
-              top: Math.round(totalH * mockupConfig.screenInset.top),
-              right: Math.round(totalW * mockupConfig.screenInset.right),
-              bottom: Math.round(totalH * mockupConfig.screenInset.bottom),
-              left: Math.round(totalW * mockupConfig.screenInset.left),
-            };
-          }
+          const { width: displayW, height: displayH } = imageDisplaySize(img, canvasWidth, canvasHeight, padding);
+          const { chromeHeight, deviceInsets } = imageFrameSize(img, displayW, displayH);
 
           return (
             <ScreenshotNode

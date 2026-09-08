@@ -1,3 +1,4 @@
+import { useAppStore } from "../stores/app.store";
 import { useEffect } from "react";
 import { useToolStore } from "../stores/tool.store";
 import { useCanvasStore } from "../stores/canvas.store";
@@ -37,6 +38,7 @@ export function useHotkeys() {
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (useAppStore.getState().batchOpen) return;
       // Don't intercept when typing in an input
       const target = e.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {

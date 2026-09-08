@@ -1,3 +1,5 @@
+import { t, useLocale } from "../../lib/i18n";
+import { imageDisplaySize } from "../../lib/image-geometry";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Stage } from "react-konva";
 import { GripHorizontal } from "lucide-react";
@@ -16,13 +18,16 @@ import type { ProgressInfo } from "../../lib/background-removal/types";
 
 interface CanvasStageProps {
   stageRef: React.RefObject<Konva.Stage | null>;
-  onBackgroundClick?: (pos: { x: number; y: number }) => void;
+  zoom: number;
+  setZoom: React.Dispatch<React.SetStateAction<number>>;
+  onBackgroundClick?: () => void;
+  onElementClick?: () => void;
 }
 
-export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStageProps) {
+export default function CanvasStage({ stageRef, zoom, setZoom, onBackgroundClick, onElementClick }: CanvasStageProps) {
+  useLocale();
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
-  const [zoom, setZoom] = useState(1);
   // Arrow drag-to-draw state
   const [drawingArrowId, setDrawingArrowId] = useState<string | null>(null);
   // Crop state
@@ -70,10 +75,9 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
   const isCropActive = activeTool === "crop" && selectedImage != null;
 
   // Compute display dimensions for selected image (same as ScreenshotLayer)
-  const availW = Math.max(canvasWidth - padding * 2, 100);
-  const availH = Math.max(canvasHeight - padding * 2, 100);
-  const selectedDisplayW = selectedImage ? Math.round(selectedImage.width * Math.min(availW / selectedImage.width, availH / selectedImage.height)) : 0;
-  const selectedDisplayH = selectedImage ? Math.round(selectedImage.height * Math.min(availW / selectedImage.width, availH / selectedImage.height)) : 0;
+  const selectedSize = selectedImage ? imageDisplaySize(selectedImage, canvasWidth, canvasHeight, padding) : { width: 0, height: 0 };
+  const selectedDisplayW = selectedSize.width;
+  const selectedDisplayH = selectedSize.height;
 
   // Initialize crop rect when entering crop mode
   useEffect(() => {
@@ -115,7 +119,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
           ctx.drawImage(tmpImg, 0, 0);
           resolve(c.toDataURL("image/png"));
         };
-        tmpImg.onerror = () => reject(new Error("Failed to load image for crop"));
+        tmpImg.onerror = () => reject(new Error(t("Failed to load image for crop")));
       });
     }
 
@@ -220,7 +224,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
     };
     el.addEventListener("wheel", handleWheel, { passive: false });
     return () => el.removeEventListener("wheel", handleWheel);
-  }, []);
+  }, [setZoom]);
 
   // Cmd+0 to reset zoom, Cmd+Z/Cmd+Shift+Z for undo/redo
   useEffect(() => {
@@ -270,7 +274,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
     };
     window.addEventListener("keydown", handleKey);
     return () => window.removeEventListener("keydown", handleKey);
-  }, [undo, redo, isCropActive, handleCropConfirm, handleCropCancel, selectedId, reorderElement]);
+  }, [undo, redo, isCropActive, handleCropConfirm, handleCropCancel, selectedId, reorderElement, setZoom]);
 
   // Background removal handler
   const handleRemoveBackground = useCallback(async (elementId: string) => {
@@ -305,7 +309,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
             ctx.drawImage(tmpImg, 0, 0);
             resolve(canvas.toDataURL("image/png"));
           };
-          tmpImg.onerror = () => reject(new Error("Failed to load image for background removal"));
+          tmpImg.onerror = () => reject(new Error(t("Failed to load image for background removal")));
         });
       }
 
@@ -326,7 +330,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
       setRemovalState((prev) => ({
         ...prev,
         isProcessing: false,
-        error: err instanceof Error ? err.message : "Background removal failed",
+        error: err instanceof Error ? err.message : t("Background removal failed"),
       }));
     }
   }, []);
@@ -378,10 +382,9 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
       if (activeTool === "select") {
         if (e.target === e.target.getStage()) {
           setSelectedId(null);
-          if (onBackgroundClick) {
-            const evt = e.evt as MouseEvent;
-            onBackgroundClick({ x: evt.clientX, y: evt.clientY });
-          }
+          onBackgroundClick?.();
+        } else {
+          onElementClick?.();
         }
         return;
       }
@@ -446,7 +449,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
             type: "text",
             x,
             y,
-            text: "Text",
+            text: t("Text"),
             fontSize,
             fontFamily: "Inter, system-ui, sans-serif",
             fill: strokeColor,
@@ -493,7 +496,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
             y,
             width: 200,
             height: 80,
-            text: "Hello!",
+            text: t("Hello!"),
             fontSize: 16,
             fontFamily: "-apple-system, BlinkMacSystemFont, Inter, system-ui, sans-serif",
             fill: "#ffffff",
@@ -551,6 +554,8 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
       fontSize,
       selectedEmoji,
       setActiveTool,
+      onBackgroundClick,
+      onElementClick,
     ],
   );
 
@@ -622,7 +627,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
             <GripHorizontal size={14} />
           </div>
           {[
-            { label: "Free", value: null },
+            { label: t("Free"), value: null },
             { label: "16:9", value: 16 / 9 },
             { label: "4:3", value: 4 / 3 },
             { label: "1:1", value: 1 },
@@ -664,13 +669,13 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
             onClick={handleCropCancel}
             className="px-3 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
           >
-            Discard
+            {t("Discard")}
           </button>
           <button
             onClick={handleCropConfirm}
             className="px-3 py-1 text-[13px] rounded-md bg-zinc-100 text-zinc-900 hover:bg-zinc-200 active:bg-zinc-300 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
           >
-            Crop
+            {t("Crop")}
           </button>
           <span className="text-[11px] text-zinc-500 ml-2">Enter · Esc</span>
         </div>
@@ -716,42 +721,7 @@ export default function CanvasStage({ stageRef, onBackgroundClick }: CanvasStage
         })()}
       />
 
-      {/* Zoom and undo controls */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-center gap-1 bg-zinc-900/90 border border-zinc-800/60 rounded-lg px-2 py-1 backdrop-blur-sm">
-        <button
-          onClick={undo}
-          className="px-2 py-1 text-[12px] text-zinc-400 hover:text-zinc-100 active:text-white rounded transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-          title="Undo (Cmd+Z)"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6.69 3L3 13"/></svg>
-        </button>
-        <button
-          onClick={redo}
-          className="px-2 py-1 text-[12px] text-zinc-400 hover:text-zinc-100 active:text-white rounded transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-          title="Redo (Cmd+Shift+Z)"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6.69 3L21 13"/></svg>
-        </button>
-        <div className="w-px h-4 bg-zinc-800/60 mx-1" />
-        <button
-          onClick={() => setZoom((z) => Math.max(z * 0.8, 0.25))}
-          className="px-2 py-1 text-[12px] text-zinc-400 hover:text-zinc-100 active:text-white rounded transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-        >
-          -
-        </button>
-        <button
-          onClick={() => setZoom(1)}
-          className="px-2 py-1 text-[11px] text-zinc-400 hover:text-zinc-100 rounded hover:bg-zinc-800/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 min-w-[3rem] text-center"
-        >
-          {Math.round(zoom * 100)}%
-        </button>
-        <button
-          onClick={() => setZoom((z) => Math.min(z * 1.2, 4))}
-          className="px-2 py-1 text-[12px] text-zinc-400 hover:text-zinc-100 active:text-white rounded transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
-        >
-          +
-        </button>
-      </div>
+
     </div>
   );
 }

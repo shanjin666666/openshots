@@ -1,17 +1,17 @@
-import { useEffect, useLayoutEffect, useRef, useState, useCallback } from "react";
-import Konva from "konva";
-import { ChevronDown, ChevronRight, GripHorizontal } from "lucide-react";
+import { t, useLocale } from "../../lib/i18n";
+import { useState } from "react";
+import { ChevronDown, ChevronRight } from "lucide-react";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { useToolStore, COLOR_PRESETS } from "../../stores/tool.store";
-import { useSelectionBounds } from "../../hooks/useSelectionBounds";
 import { extractDominantColor } from "../../lib/colorAnalysis";
-import { computeFanLayout } from "../../lib/fanLayout";
+import AutoLayoutControls from "./AutoLayoutControls";
 
 function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
     <div>
       <button
+        aria-expanded={open}
         onClick={() => setOpen(!open)}
         className="flex items-center gap-1 w-full text-left text-[11px] font-medium text-zinc-400 tracking-wide hover:text-zinc-200 transition-colors"
       >
@@ -23,11 +23,8 @@ function Section({ title, defaultOpen = true, children }: { title: string; defau
   );
 }
 
-interface ElementPopoverProps {
-  stageRef: React.RefObject<Konva.Stage | null>;
-}
-
-export default function ElementPopover({ stageRef }: ElementPopoverProps) {
+export default function ElementProperties() {
+  useLocale();
   const selectedId = useCanvasStore((s) => s.selectedId);
   const images = useCanvasStore((s) => s.images);
   const annotations = useCanvasStore((s) => s.annotations);
@@ -37,136 +34,16 @@ export default function ElementPopover({ stageRef }: ElementPopoverProps) {
   const updatePrivacyRegion = useCanvasStore((s) => s.updatePrivacyRegion);
   const padding = useCanvasStore((s) => s.padding);
   const setPadding = useCanvasStore((s) => s.setPadding);
-  const canvasWidth = useCanvasStore((s) => s.canvasWidth);
-  const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const setStrokeWidth = useToolStore((s) => s.setStrokeWidth);
   const setStrokeColor = useToolStore((s) => s.setStrokeColor);
-
-  const bounds = useSelectionBounds(stageRef, selectedId);
-  const popoverRef = useRef<HTMLDivElement>(null);
-  const [visible, setVisible] = useState(false);
-  const [popoverSize, setPopoverSize] = useState({ width: 0, height: 0 });
-  const [dragOffset, setDragOffset] = useState<{ x: number; y: number } | null>(null);
-  const isDraggingRef = useRef(false);
-
-  const handleDragStart = useCallback((e: React.MouseEvent) => {
-    isDraggingRef.current = true;
-    const el = popoverRef.current;
-    if (!el) return;
-    const startX = e.clientX;
-    const startY = e.clientY;
-    const offsetX = dragOffset?.x ?? 0;
-    const offsetY = dragOffset?.y ?? 0;
-
-    const onMove = (ev: MouseEvent) => {
-      setDragOffset({
-        x: offsetX + (ev.clientX - startX),
-        y: offsetY + (ev.clientY - startY),
-      });
-    };
-    const onUp = () => {
-      isDraggingRef.current = false;
-      document.removeEventListener("mousemove", onMove);
-      document.removeEventListener("mouseup", onUp);
-    };
-    document.addEventListener("mousemove", onMove);
-    document.addEventListener("mouseup", onUp);
-  }, [dragOffset]);
-
-  // Reset drag offset when selection changes
-  useEffect(() => {
-    setDragOffset(null);
-  }, [selectedId]);
 
   const selected = images.find((img) => img.id === selectedId);
   const selectedAnnotation = annotations.find((a) => a.id === selectedId);
   const selectedPrivacy = privacyRegions.find((r) => r.id === selectedId);
 
-  // Animate in on mount
-  useEffect(() => {
-    const raf = requestAnimationFrame(() => setVisible(true));
-    return () => cancelAnimationFrame(raf);
-  }, []);
-
-  // Measure popover dimensions after render
-  useLayoutEffect(() => {
-    const el = popoverRef.current;
-    if (el) {
-      const w = el.offsetWidth;
-      const h = el.offsetHeight;
-      setPopoverSize((prev) =>
-        prev.width === w && prev.height === h ? prev : { width: w, height: h }
-      );
-    }
-  }, [bounds, selected, selectedAnnotation, selectedPrivacy]);
-
-  // Dismiss on outside click
-  useEffect(() => {
-    const handleMouseDown = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node)) {
-        // Don't interfere -- CanvasStage handles deselection
-      }
-    };
-    document.addEventListener("mousedown", handleMouseDown);
-    return () => document.removeEventListener("mousedown", handleMouseDown);
-  }, []);
-
-  // Dismiss on Escape
-  useEffect(() => {
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        useCanvasStore.getState().setSelectedId(null);
-      }
-    };
-    window.addEventListener("keydown", handleKey);
-    return () => window.removeEventListener("keydown", handleKey);
-  }, []);
-
-  if (!bounds || (!selected && !selectedAnnotation && !selectedPrivacy)) {
-    return null;
+  if (!selected && !selectedAnnotation && !selectedPrivacy) {
+    return <p className="p-4 text-sm text-zinc-500">{t("Select an image or annotation to edit its properties")}</p>;
   }
-
-  // Position: centered above selection, 12px gap
-  const GAP = 12;
-  const EDGE_PAD = 8;
-  const pw = popoverSize.width || 288;
-  const ph = popoverSize.height || 200;
-
-  let top = bounds.y - ph - GAP;
-  let isBelow = false;
-  if (top < EDGE_PAD) {
-    top = bounds.y + bounds.height + GAP;
-    isBelow = true;
-  }
-  // Clamp to viewport bottom
-  if (top + ph > window.innerHeight - EDGE_PAD) {
-    top = window.innerHeight - EDGE_PAD - ph;
-  }
-
-  let left = bounds.x + bounds.width / 2 - pw / 2;
-  left = Math.max(EDGE_PAD, Math.min(left, window.innerWidth - pw - EDGE_PAD));
-
-  // Use isBelow directly instead of tracking in state
-
-  // Caret horizontal position relative to popover
-  const caretLeft = Math.max(
-    12,
-    Math.min(bounds.x + bounds.width / 2 - left, pw - 12),
-  );
-
-  const handleFanLayout = () => {
-    const positions = computeFanLayout(images.length, canvasWidth, canvasHeight);
-    const store = useCanvasStore.getState();
-    images.forEach((img, i) => {
-      if (positions[i]) {
-        store.updateImage(img.id, {
-          x: positions[i].x,
-          y: positions[i].y,
-          rotation: positions[i].rotation,
-        });
-      }
-    });
-  };
 
   const handleAutoInsetBorder = () => {
     if (!selected) return;
@@ -182,57 +59,17 @@ export default function ElementPopover({ stageRef }: ElementPopoverProps) {
   };
 
   return (
-    <div
-      ref={popoverRef}
-      className={`fixed z-50 w-72 max-h-[70vh] overflow-y-auto bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl p-3 space-y-3 transition-[opacity,transform] duration-150 ${
-        visible ? "opacity-100 scale-100" : "opacity-0 scale-95"
-      }`}
-      style={{
-        top: top + (dragOffset?.y ?? 0),
-        left: left + (dragOffset?.x ?? 0),
-        transformOrigin: isBelow ? "top center" : "bottom center",
-      }}
-      onMouseDown={(e) => e.stopPropagation()}
-    >
-      {/* Drag handle header */}
-      <div
-        onMouseDown={handleDragStart}
-        className="flex items-center justify-center cursor-grab active:cursor-grabbing py-0.5 -mt-1 mb-1"
-      >
-        <GripHorizontal size={14} className="text-zinc-600" />
-      </div>
-
-      {/* Caret arrow (hidden when dragged) */}
-      {!dragOffset && <div
-        className="absolute w-0 h-0"
-        style={{
-          left: caretLeft - 6,
-          ...(isBelow
-            ? {
-                top: -6,
-                borderLeft: "6px solid transparent",
-                borderRight: "6px solid transparent",
-                borderBottom: "6px solid rgb(63 63 70 / 0.6)",
-              }
-            : {
-                bottom: -6,
-                borderLeft: "6px solid transparent",
-                borderRight: "6px solid transparent",
-                borderTop: "6px solid rgb(63 63 70 / 0.6)",
-              }),
-        }}
-      />}
+    <div className="p-4 space-y-5">
+      {selected && <AutoLayoutControls />}
 
       {/* Image controls */}
       {selected && (
-        <Section title="Image Properties" defaultOpen>
+        <Section title={t("Image Properties")} defaultOpen>
           <ImageControls
             selected={selected}
             updateImage={updateImage}
             padding={padding}
             setPadding={setPadding}
-            images={images}
-            onFanLayout={handleFanLayout}
             onAutoInsetBorder={handleAutoInsetBorder}
           />
         </Section>
@@ -240,7 +77,7 @@ export default function ElementPopover({ stageRef }: ElementPopoverProps) {
 
       {/* Annotation controls */}
       {selectedAnnotation && (
-        <Section title="Shape Properties" defaultOpen>
+        <Section title={t("Shape Properties")} defaultOpen>
           <AnnotationControls
             annotation={selectedAnnotation}
             updateAnnotation={updateAnnotation}
@@ -252,7 +89,7 @@ export default function ElementPopover({ stageRef }: ElementPopoverProps) {
 
       {/* Privacy region controls */}
       {selectedPrivacy && (
-        <Section title="Blur / Pixelate" defaultOpen>
+        <Section title={t("Blur / Pixelate")} defaultOpen>
           <PrivacyControls
             region={selectedPrivacy}
             updatePrivacyRegion={updatePrivacyRegion}
@@ -270,31 +107,25 @@ function ImageControls({
   updateImage,
   padding,
   setPadding,
-  images,
-  onFanLayout,
   onAutoInsetBorder,
 }: {
   selected: ReturnType<typeof useCanvasStore.getState>["images"][0];
   updateImage: ReturnType<typeof useCanvasStore.getState>["updateImage"];
   padding: number;
   setPadding: (v: number) => void;
-  images: ReturnType<typeof useCanvasStore.getState>["images"];
-  onFanLayout: () => void;
   onAutoInsetBorder: () => void;
 }) {
+  useLocale();
   return (
     <>
-      <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        Image Properties
-      </h3>
-
       {/* Padding */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Padding</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Padding")}</label>
         <input
           type="range"
           min={0}
           max={200}
+          aria-label={t("Padding")}
           value={padding}
           onChange={(e) => setPadding(Number(e.target.value))}
           className="flex-1 accent-zinc-400"
@@ -306,11 +137,12 @@ function ImageControls({
 
       {/* Corner radius */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Corners</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Corners")}</label>
         <input
           type="range"
           min={0}
           max={48}
+          aria-label={t("Corners")}
           value={selected.cornerRadius}
           onChange={(e) =>
             updateImage(selected.id, {
@@ -337,17 +169,18 @@ function ImageControls({
             }
             className="rounded accent-zinc-400 focus-visible:ring-1 focus-visible:ring-zinc-500"
           />
-          <span className="text-[13px] text-zinc-300">Drop Shadow</span>
+          <span className="text-[13px] text-zinc-300">{t("Drop Shadow")}</span>
         </label>
 
         {selected.shadow.enabled && (
           <>
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Blur</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Blur")}</label>
               <input
                 type="range"
                 min={0}
                 max={60}
+                aria-label={t("Shadow blur")}
                 value={selected.shadow.blur}
                 onChange={(e) =>
                   updateImage(selected.id, {
@@ -358,11 +191,12 @@ function ImageControls({
               />
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Offset Y</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Offset Y")}</label>
               <input
                 type="range"
                 min={-40}
                 max={40}
+                aria-label={t("Offset Y")}
                 value={selected.shadow.offsetY}
                 onChange={(e) =>
                   updateImage(selected.id, {
@@ -392,7 +226,7 @@ function ImageControls({
             }
             className="rounded accent-zinc-400 focus-visible:ring-1 focus-visible:ring-zinc-500"
           />
-          <span className="text-[13px] text-zinc-300">Inset Border</span>
+          <span className="text-[13px] text-zinc-300">{t("Inset Border")}</span>
         </label>
 
         {selected.insetBorder.enabled && (
@@ -400,7 +234,7 @@ function ImageControls({
             onClick={onAutoInsetBorder}
             className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
           >
-            Auto-match color
+            {t("Auto-match color")}
           </button>
         )}
       </div>
@@ -413,7 +247,7 @@ function ImageControls({
           }
           className="flex-1 px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
         >
-          Flip H
+          {t("Flip H")}
         </button>
         <button
           onClick={() =>
@@ -421,16 +255,16 @@ function ImageControls({
           }
           className="flex-1 px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
         >
-          Flip V
+          {t("Flip V")}
         </button>
       </div>
 
       {/* Frame / Mockup */}
       <div>
-        <label className="text-[11px] text-zinc-500 mb-1 block">Frame</label>
+        <label className="text-[11px] text-zinc-500 mb-1 block">{t("Frame")}</label>
         <div className="flex flex-wrap gap-1">
           {[
-            { label: "None", type: undefined, variant: undefined },
+            { label: t("None"), type: undefined, variant: undefined },
             { label: "macOS", type: "window-chrome" as const, variant: "macos" },
             { label: "Windows", type: "window-chrome" as const, variant: "windows" },
             { label: "iPhone", type: "device-mockup" as const, variant: "iphone" },
@@ -471,22 +305,13 @@ function ImageControls({
                     : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/60"
                 }`}
               >
-                {theme.charAt(0).toUpperCase() + theme.slice(1)}
+                {t(theme === "light" ? "Light" : "Dark")}
               </button>
             ))}
           </div>
         )}
       </div>
 
-      {/* Fan layout */}
-      {images.length > 1 && (
-        <button
-          onClick={onFanLayout}
-          className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
-        >
-          Auto Fan Layout
-        </button>
-      )}
     </>
   );
 }
@@ -504,15 +329,16 @@ function AnnotationControls({
   setStrokeColor: (c: string) => void;
   setStrokeWidth: (w: number) => void;
 }) {
+  useLocale();
   return (
     <>
       <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        Annotation
+        {t("Annotation")}
       </h3>
 
       {/* Color row */}
       <div className="space-y-2">
-        <label className="text-[11px] text-zinc-500">Color</label>
+        <label className="text-[11px] text-zinc-500">{t("Color")}</label>
         <div className="flex flex-wrap gap-1 mt-1">
           {COLOR_PRESETS.map((color) => {
             const currentColor =
@@ -564,7 +390,7 @@ function AnnotationControls({
       {(annotation.type === "rectangle" || annotation.type === "ellipse" || annotation.type === "arrow") && (
         <div>
           <div className="flex items-center justify-between mb-1">
-            <label className="text-[11px] text-zinc-500">Fill</label>
+            <label className="text-[11px] text-zinc-500">{t("Fill")}</label>
             <button
               onClick={() => {
                 const current = (annotation as { fill?: string }).fill ?? (annotation as { stroke: string }).stroke;
@@ -578,7 +404,7 @@ function AnnotationControls({
                   : "bg-zinc-700/60 text-zinc-300"
               }`}
             >
-              {(annotation as { fill?: string }).fill === "transparent" ? "None" : "On"}
+              {(annotation as { fill?: string }).fill === "transparent" ? t("None") : t("On")}
             </button>
           </div>
           {(annotation as { fill?: string }).fill !== "transparent" && (
@@ -624,7 +450,7 @@ function AnnotationControls({
         annotation.type === "rectangle" ||
         annotation.type === "ellipse") && (
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Stroke</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Stroke")}</label>
           <div className="flex gap-1">
             {[1, 2, 4, 8].map((w) => (
               <button
@@ -651,13 +477,13 @@ function AnnotationControls({
         annotation.type === "rectangle" ||
         annotation.type === "ellipse") && (
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Dash</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Dash")}</label>
           <div className="flex gap-1">
             {(
               [
-                { label: "Solid", value: undefined },
-                { label: "Dashed", value: [10, 5] },
-                { label: "Dotted", value: [2, 6] },
+                { label: t("Solid line"), value: undefined },
+                { label: t("Dashed"), value: [10, 5] },
+                { label: t("Dotted"), value: [2, 6] },
               ] as const
             ).map((preset) => {
               const currentDash = (annotation as { dash?: number[] }).dash;
@@ -692,7 +518,7 @@ function AnnotationControls({
       {/* Font Size -- text annotations */}
       {annotation.type === "text" && (
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Size</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Size")}</label>
           <input
             type="range"
             min={10}
@@ -719,7 +545,7 @@ function AnnotationControls({
           <>
             {/* Text color */}
             <div>
-              <label className="text-[11px] text-zinc-500">Text Color</label>
+              <label className="text-[11px] text-zinc-500">{t("Text Color")}</label>
               <div className="flex flex-wrap gap-1 mt-1">
                 {COLOR_PRESETS.map((color) => (
                   <button
@@ -736,7 +562,7 @@ function AnnotationControls({
 
             {/* Fill color */}
             <div>
-              <label className="text-[11px] text-zinc-500">Bubble Fill</label>
+              <label className="text-[11px] text-zinc-500">{t("Bubble Fill")}</label>
               <div className="flex flex-wrap gap-1 mt-1">
                 {["#ffffff", "#f4f4f5", "#18181b", "#ef4444", "#3b82f6", "#22c55e", "#eab308", "#a855f7"].map((color) => (
                   <button
@@ -753,7 +579,7 @@ function AnnotationControls({
 
             {/* Font size */}
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Size</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Size")}</label>
               <input
                 type="range"
                 min={10}
@@ -768,7 +594,7 @@ function AnnotationControls({
 
             {/* Tail direction */}
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Tail</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Tail")}</label>
               <div className="flex gap-1">
                 {(["bottom", "top", "left", "right"] as const).map((dir) => (
                   <button
@@ -788,7 +614,7 @@ function AnnotationControls({
 
             {/* Corner radius */}
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Round</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Round")}</label>
               <input
                 type="range"
                 min={0}
@@ -809,7 +635,7 @@ function AnnotationControls({
         return (
           <>
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Opacity</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Opacity")}</label>
               <input
                 type="range"
                 min={10}
@@ -823,7 +649,7 @@ function AnnotationControls({
               </span>
             </div>
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Round</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Round")}</label>
               <input
                 type="range"
                 min={0}
@@ -850,14 +676,15 @@ function PrivacyControls({
   region: ReturnType<typeof useCanvasStore.getState>["privacyRegions"][0];
   updatePrivacyRegion: ReturnType<typeof useCanvasStore.getState>["updatePrivacyRegion"];
 }) {
+  useLocale();
   return (
     <>
       <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        {region.type === "blur" ? "Blur" : "Pixelate"} Region
+        {region.type === "blur" ? t("Blur") : t("Pixelate")} {t("Region")}
       </h3>
 
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Intensity</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Intensity")}</label>
         <input
           type="range"
           min={1}
@@ -876,7 +703,7 @@ function PrivacyControls({
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Opacity</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Opacity")}</label>
         <input
           type="range"
           min={0}
@@ -895,7 +722,7 @@ function PrivacyControls({
       </div>
 
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Color</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Color")}</label>
         <input
           type="color"
           value={

@@ -51,6 +51,7 @@ export function useCaptureFlow() {
   /** Start countdown or capture immediately depending on selfTimerDelay. */
   const startCaptureWithTimer = useCallback(
     (mode: "fullscreen" | "region" | "window") => {
+      if (useAppStore.getState().batchOpen) return;
       const delay = useAppStore.getState().selfTimerDelay;
       if (delay > 0) {
         setCountdownRemaining(delay);

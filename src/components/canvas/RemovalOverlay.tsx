@@ -1,3 +1,4 @@
+import { t, useLocale } from "../../lib/i18n";
 interface RemovalOverlayProps {
   imageId: string | null;
   isProcessing: boolean;
@@ -17,6 +18,7 @@ export default function RemovalOverlay({
   onRetry,
   imageRect,
 }: RemovalOverlayProps) {
+  useLocale();
   if (!imageId) return null;
 
   const isDownloading =
@@ -30,7 +32,7 @@ export default function RemovalOverlay({
         <div className="absolute bottom-16 left-1/2 -translate-x-1/2 z-50">
           <div className="bg-zinc-900 border border-zinc-700/60 rounded-lg shadow-xl px-4 py-3 min-w-[280px]">
             <p className="text-[13px] text-zinc-200 mb-2">
-              Downloading AI model... {Math.round(progress)}%
+              {t("Downloading AI model...")}{Math.round(progress)}%
             </p>
             <div className="w-full h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div
@@ -51,7 +53,7 @@ export default function RemovalOverlay({
               onClick={onRetry}
               className="px-3 py-1 text-[13px] rounded-md bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors"
             >
-              Retry
+              {t("Retry")}
             </button>
           </div>
         </div>
@@ -70,7 +72,7 @@ export default function RemovalOverlay({
         >
           <div className="flex flex-col items-center gap-2">
             <div className="w-6 h-6 border-2 border-zinc-400 border-t-transparent rounded-full animate-spin" />
-            <span className="text-[12px] text-zinc-200">Removing background...</span>
+            <span className="text-[12px] text-zinc-200">{t("Removing background...")}</span>
           </div>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { t, useLocale } from "./lib/i18n";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
@@ -13,18 +14,17 @@ import RegionOverlay from "./components/capture/RegionOverlay";
 import CountdownOverlay from "./components/capture/CountdownOverlay";
 import WindowPicker from "./components/capture/WindowPicker";
 import WaylandBanner from "./components/shell/WaylandBanner";
+import BatchPage from "./components/batch/BatchPage";
 import SettingsPage from "./components/shell/SettingsPage";
 import RecentProjects from "./components/shell/RecentProjects";
 import CanvasStage, { addScreenshotToCanvas } from "./components/canvas/CanvasStage";
 import EditorToolbar from "./components/toolbar/EditorToolbar";
-import BackgroundPopover from "./components/toolbar/BackgroundPopover";
-import ElementPopover from "./components/toolbar/ElementPopover";
-import DragBar from "./components/toolbar/DragBar";
+import EditorSidebar, { type EditorPanel } from "./components/editor/EditorSidebar";
 import ShortcutsModal from "./components/shell/ShortcutsModal";
 import { useHotkeys } from "./hooks/useHotkeys";
 import { createAutoSaveProject, startAutoSave, stopAutoSave } from "./lib/auto-save";
 
-type View = "main" | "settings";
+type View = "main" | "settings" | "batch";
 
 function addImageFromUrl(url: string) {
   console.log("[Screenshots] Loading image from:", url);
@@ -96,6 +96,7 @@ function addImageFromUrl(url: string) {
 }
 
 export default function App() {
+  useLocale();
   const setWayland = useAppStore((s) => s.setWayland);
   const captureState = useAppStore((s) => s.captureState);
   const lastCapturePath = useAppStore((s) => s.lastCapturePath);
@@ -109,7 +110,13 @@ export default function App() {
   const setRetinaDownscale = useAppStore((s) => s.setRetinaDownscale);
   const [view, setView] = useState<View>("main");
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const [bgPopover, setBgPopover] = useState<{ x: number; y: number } | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const selectedId = useCanvasStore((s) => s.selectedId);
+  const [panelChoice, setPanelChoice] = useState<{ selectedId: string | null; panel: EditorPanel } | null>(null);
+  const editorPanel = panelChoice?.selectedId === selectedId ? panelChoice.panel : selectedId ? "element" : "background";
+  const setEditorPanel = useCallback((panel: EditorPanel) => {
+    setPanelChoice({ selectedId: useCanvasStore.getState().selectedId, panel });
+  }, []);
   const stageRef = useRef<Konva.Stage>(null);
 
   useHotkeys();
@@ -137,7 +144,7 @@ export default function App() {
         multiple: false,
         filters: [
           {
-            name: "Images",
+            name: t("Images"),
             extensions: ["png", "jpg", "jpeg", "webp", "gif", "bmp"],
           },
         ],
@@ -169,7 +176,7 @@ export default function App() {
   // Listen for navigation events from tray
   useEffect(() => {
     const unlisten = listen<string>("navigate", (event) => {
-      if (event.payload === "/settings") setView("settings");
+      if (event.payload === "/settings" && !useAppStore.getState().batchOpen) setView("settings");
     });
     return () => {
       unlisten.then((fn) => fn());
@@ -184,7 +191,7 @@ export default function App() {
     let unlisten: (() => void) | undefined;
     getCurrentWebview()
       .onDragDropEvent(async (event) => {
-        if (event.payload.type === "drop") {
+        if (event.payload.type === "drop" && !useAppStore.getState().batchOpen) {
           let projectOpened = false;
           for (const filePath of event.payload.paths) {
             const ext = filePath.split(".").pop()?.toLowerCase() ?? "";
@@ -228,6 +235,7 @@ export default function App() {
   // Delete selected element (undo/redo is handled in CanvasStage)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (useAppStore.getState().batchOpen) return;
       if (e.key === "Delete" || e.key === "Backspace") {
         const target = e.target as HTMLElement;
         if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
@@ -246,12 +254,15 @@ export default function App() {
   useEffect(() => {
     const listeners = [
       listen("menu:open-project", () => {
+        if (useAppStore.getState().batchOpen) return;
         import("./lib/project-file").then((m) => m.openProject());
       }),
       listen("menu:save-project", () => {
+        if (useAppStore.getState().batchOpen) return;
         import("./lib/project-file").then((m) => m.saveProject());
       }),
       listen("menu:export", () => {
+        if (useAppStore.getState().batchOpen) return;
         window.dispatchEvent(new Event("openExportPopover"));
       }),
     ];
@@ -281,6 +292,8 @@ export default function App() {
     );
   }
 
+  if (view === "batch") return <BatchPage onBack={() => setView("main")} />;
+
   // Settings page
   if (view === "settings") {
     return <SettingsPage onBack={() => setView("main")} />;
@@ -299,19 +312,19 @@ export default function App() {
             onClick={() => void handleFullscreen()}
             className="px-3 py-1.5 text-[13px] rounded-md bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
           >
-            Full Screen
+            {t("Full Screen")}
           </button>
           <button
             onClick={() => void handleRegionStart()}
             className="px-3 py-1.5 text-[13px] rounded-md bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
           >
-            Region
+            {t("Region")}
           </button>
           <button
             onClick={() => setCaptureState("selecting-window")}
             className="px-3 py-1.5 text-[13px] rounded-md bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
           >
-            Window
+            {t("Window")}
           </button>
         </div>
 
@@ -321,7 +334,10 @@ export default function App() {
           onClick={() => void handleUpload()}
           className="px-3 py-1.5 text-[13px] rounded-md bg-zinc-800/80 text-zinc-300 hover:bg-zinc-700 hover:text-zinc-100 transition-colors"
         >
-          Upload
+          {t("Upload")}
+        </button>
+        <button onClick={() => setView("batch")} className="px-3 py-1.5 text-[13px] rounded-md bg-blue-500/15 text-blue-300 hover:bg-blue-500/25 transition-colors">
+          {t("Batch beautify")}
         </button>
 
         <div className="w-px h-4 bg-zinc-800/60 mx-1" />
@@ -338,7 +354,7 @@ export default function App() {
                   : "text-zinc-500 hover:text-zinc-300"
               }`}
             >
-              {delay === 0 ? "No Timer" : `${delay}s`}
+              {delay === 0 ? t("No Timer") : t("{count}s", { count: delay })}
             </button>
           ))}
         </div>
@@ -352,7 +368,7 @@ export default function App() {
                 ? "bg-zinc-100 text-zinc-900"
                 : "text-zinc-500 hover:text-zinc-300"
             }`}
-            title="Scale down Retina screenshots to 1x"
+            title={t("Scale down Retina screenshots to 1x")}
           >
             @1x
           </button>
@@ -362,7 +378,7 @@ export default function App() {
 
         {captureState === "capturing" && (
           <span className="text-[13px] text-zinc-500 animate-pulse">
-            Capturing...
+            {t("Capturing...")}
           </span>
         )}
 
@@ -370,7 +386,7 @@ export default function App() {
           onClick={() => void openUrl("https://www.tracekit.dev")}
           className="text-[11px] text-zinc-600 hover:text-zinc-400 transition-colors mr-1"
         >
-          by TraceKit
+          {t("by TraceKit")}
         </button>
 
         <button
@@ -383,40 +399,35 @@ export default function App() {
           onClick={() => setView("settings")}
           className="px-2.5 py-1.5 text-[13px] text-zinc-500 hover:text-zinc-300 rounded-md hover:bg-zinc-800/60 transition-colors"
         >
-          Settings
+          {t("Settings")}
         </button>
       </div>
 
       {/* Editor toolbar -- only visible when images exist */}
-      {hasImages && <EditorToolbar stageRef={stageRef} />}
+      {hasImages && <EditorToolbar stageRef={stageRef} zoom={zoom} setZoom={setZoom} />}
 
-      {/* Canvas area -- full width, no sidebars */}
-      <div className="flex-1 min-h-0 overflow-hidden relative">
-        {hasImages ? (
-          <CanvasStage
-            stageRef={stageRef}
-            onBackgroundClick={(pos) => setBgPopover(pos)}
-          />
-        ) : (
-          <EmptyState
-            onFullscreen={() => void handleFullscreen()}
-            onRegion={() => void handleRegionStart()}
-            onWindow={() => setCaptureState("selecting-window")}
-            onUpload={() => void handleUpload()}
-          />
-        )}
-
-        {/* Drag bar -- absolutely positioned at bottom of canvas area */}
-        {hasImages && <DragBar stageRef={stageRef} />}
+      {/* Properties stay docked; only the canvas viewport changes size. */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        {hasImages && <EditorSidebar panel={editorPanel} onPanelChange={setEditorPanel} />}
+        <div className="flex-1 min-w-0 min-h-0 overflow-hidden relative">
+          {hasImages ? (
+            <CanvasStage
+              stageRef={stageRef}
+              zoom={zoom}
+              setZoom={setZoom}
+              onBackgroundClick={() => setEditorPanel("background")}
+              onElementClick={() => setEditorPanel("element")}
+            />
+          ) : (
+            <EmptyState
+              onFullscreen={() => void handleFullscreen()}
+              onRegion={() => void handleRegionStart()}
+              onWindow={() => setCaptureState("selecting-window")}
+              onUpload={() => void handleUpload()}
+            />
+          )}
+        </div>
       </div>
-
-      {/* Element property popover -- anchored near selected element */}
-      {hasImages && <ElementPopover stageRef={stageRef} />}
-
-      {/* Background popover */}
-      {bgPopover && (
-        <BackgroundPopover position={bgPopover} onClose={() => setBgPopover(null)} />
-      )}
 
       {/* Window picker modal */}
       {captureState === "selecting-window" && (
@@ -445,6 +456,7 @@ function EmptyState({
   onWindow: () => void;
   onUpload: () => void;
 }) {
+  useLocale();
   return (
     <div className="flex-1 flex items-center justify-center bg-zinc-900/50 h-full">
       <div className="flex flex-col items-center gap-6 max-w-sm">
@@ -469,10 +481,10 @@ function EmptyState({
 
         <div className="text-center space-y-1.5">
           <h2 className="text-[15px] font-medium text-zinc-200">
-            Capture or upload a screenshot
+            {t("Capture or upload a screenshot")}
           </h2>
           <p className="text-[13px] text-zinc-500 leading-relaxed">
-            Take a screenshot of your screen, a window, or upload an image to start editing.
+            {t("Take a screenshot of your screen, a window, or upload an image to start editing.")}
           </p>
         </div>
 
@@ -482,26 +494,26 @@ function EmptyState({
             onClick={onFullscreen}
             className="px-4 py-2 text-[13px] font-medium rounded-lg bg-white text-zinc-900 hover:bg-zinc-200 transition-colors"
           >
-            Full Screen
+            {t("Full Screen")}
           </button>
           <button
             onClick={onRegion}
             className="px-4 py-2 text-[13px] font-medium rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors"
           >
-            Region
+            {t("Region")}
           </button>
           <button
             onClick={onWindow}
             className="px-4 py-2 text-[13px] font-medium rounded-lg bg-zinc-800 text-zinc-200 hover:bg-zinc-700 transition-colors"
           >
-            Window
+            {t("Window")}
           </button>
         </div>
 
         {/* Divider */}
         <div className="flex items-center gap-3 w-full">
           <div className="flex-1 h-px bg-zinc-800/60" />
-          <span className="text-[11px] text-zinc-600">or</span>
+          <span className="text-[11px] text-zinc-600">{t("or")}</span>
           <div className="flex-1 h-px bg-zinc-800/60" />
         </div>
 
@@ -510,11 +522,11 @@ function EmptyState({
           onClick={onUpload}
           className="px-4 py-2 text-[13px] rounded-lg bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
         >
-          Upload image
+          {t("Upload image")}
         </button>
 
         <p className="text-[11px] text-zinc-600">
-          You can also drag and drop images onto the canvas
+          {t("You can also drag and drop images onto the canvas")}
         </p>
 
         {/* Recent projects */}

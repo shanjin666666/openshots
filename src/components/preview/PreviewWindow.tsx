@@ -1,3 +1,4 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { emit, listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
@@ -5,6 +6,7 @@ import { invoke } from "@tauri-apps/api/core";
 const AUTO_DISMISS_MS = 5000;
 
 export default function PreviewWindow() {
+  useLocale();
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [hovered, setHovered] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,7 +85,7 @@ export default function PreviewWindow() {
   if (!imageUrl) {
     return (
       <div className="w-full h-full bg-zinc-900 flex items-center justify-center">
-        <span className="text-zinc-600 text-[11px]">Waiting...</span>
+        <span className="text-zinc-600 text-[11px]">{t("Waiting...")}</span>
       </div>
     );
   }
@@ -97,7 +99,7 @@ export default function PreviewWindow() {
       {/* Thumbnail */}
       <img
         src={imageUrl}
-        alt="Capture preview"
+        alt={t("Capture preview")}
         className="w-full h-full object-cover"
         draggable={false}
       />
@@ -106,7 +108,7 @@ export default function PreviewWindow() {
       <button
         onClick={dismiss}
         className="absolute top-1.5 right-1.5 w-5 h-5 rounded-full bg-black/60 text-white/80 hover:bg-black/80 hover:text-white flex items-center justify-center text-[11px] leading-none transition-colors"
-        aria-label="Dismiss"
+        aria-label={t("Dismiss")}
       >
         x
       </button>
@@ -118,13 +120,13 @@ export default function PreviewWindow() {
             onClick={handleEdit}
             className="flex-1 py-1.5 text-[11px] font-medium rounded bg-blue-600 hover:bg-blue-500 text-white transition-colors"
           >
-            Edit
+            {t("Edit")}
           </button>
           <button
             onClick={() => void handleSave()}
             className="flex-1 py-1.5 text-[11px] font-medium rounded bg-emerald-600 hover:bg-emerald-500 text-white transition-colors"
           >
-            Save
+            {t("Save")}
           </button>
         </div>
       )}

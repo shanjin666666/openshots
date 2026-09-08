@@ -1,3 +1,5 @@
+import { backgroundGradient } from "../../lib/background-gradient";
+import { backgroundImageCrop } from "../../lib/background-image";
 import { Rect, Image as KonvaImage, Layer } from "react-konva";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { useEffect, useRef, useState } from "react";
@@ -15,15 +17,16 @@ export default function BackgroundLayer() {
 
   // Load background image if type is "image"
   useEffect(() => {
+    let disposed = false;
+    setBgImage(null);
     if (background.type === "image" && background.imageSrc) {
       const img = new window.Image();
       img.crossOrigin = "anonymous";
-      img.src = background.imageSrc;
-      img.onload = () => setBgImage(img);
+      img.onload = () => { if (!disposed) setBgImage(img); };
       img.onerror = () => console.error("[Screenshots] Failed to load background image");
-    } else {
-      setBgImage(null);
+      img.src = background.imageSrc;
     }
+    return () => { disposed = true; };
   }, [background.type, background.imageSrc]);
 
   // Apply blur filter to gradient/solid rect
@@ -38,7 +41,7 @@ export default function BackgroundLayer() {
     } else {
       node.filters([]);
     }
-  }, [background]);
+  }, [background, canvasWidth, canvasHeight]);
 
   // Apply blur filter to background image
   useEffect(() => {
@@ -54,45 +57,6 @@ export default function BackgroundLayer() {
     }
   }, [background.blur, bgImage, canvasWidth, canvasHeight]);
 
-  const gradientFill = () => {
-    const angle = (background.gradientAngle * Math.PI) / 180;
-    const cos = Math.cos(angle);
-    const sin = Math.sin(angle);
-    const halfW = canvasWidth / 2;
-    const halfH = canvasHeight / 2;
-
-    if (background.type === "radial-gradient") {
-      return {
-        fillRadialGradientStartPoint: { x: halfW, y: halfH },
-        fillRadialGradientEndPoint: { x: halfW, y: halfH },
-        fillRadialGradientStartRadius: 0,
-        fillRadialGradientEndRadius: Math.max(halfW, halfH),
-        fillRadialGradientColorStops: [
-          0,
-          background.gradientColors[0],
-          1,
-          background.gradientColors[1],
-        ] as number[],
-      };
-    }
-
-    return {
-      fillLinearGradientStartPoint: {
-        x: halfW - cos * halfW,
-        y: halfH - sin * halfH,
-      },
-      fillLinearGradientEndPoint: {
-        x: halfW + cos * halfW,
-        y: halfH + sin * halfH,
-      },
-      fillLinearGradientColorStops: [
-        0,
-        background.gradientColors[0],
-        1,
-        background.gradientColors[1],
-      ] as number[],
-    };
-  };
 
   return (
     <Layer listening={false}>
@@ -104,6 +68,7 @@ export default function BackgroundLayer() {
           y={0}
           width={canvasWidth}
           height={canvasHeight}
+          crop={backgroundImageCrop(bgImage.naturalWidth, bgImage.naturalHeight, canvasWidth, canvasHeight)}
         />
       ) : background.type === "solid" ? (
         <Rect
@@ -121,7 +86,7 @@ export default function BackgroundLayer() {
           y={0}
           width={canvasWidth}
           height={canvasHeight}
-          {...gradientFill()}
+          {...backgroundGradient(background, canvasWidth, canvasHeight)}
         />
       )}
     </Layer>

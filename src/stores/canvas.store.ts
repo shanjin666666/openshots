@@ -1,5 +1,7 @@
 import { create } from "zustand";
 import { temporal } from "zundo";
+import { computeImageLayout, type ImageLayout, type LayoutSpacing, type ImageLayoutSettings } from "../lib/image-layout";
+import { resizeCanvasImages } from "../lib/canvas-resize";
 
 // ---------- Types ----------
 
@@ -179,6 +181,7 @@ export interface CanvasState {
 
   // Images on canvas
   images: CanvasImage[];
+  imageLayout: ImageLayoutSettings | null;
 
   // Annotations
   annotations: AnnotationShape[];
@@ -201,6 +204,7 @@ interface CanvasActions {
   // Images
   addImage: (image: CanvasImage) => void;
   updateImage: (id: string, updates: Partial<CanvasImage>) => void;
+  applyImageLayout: (layout: ImageLayout, spacing: LayoutSpacing) => void;
   removeImage: (id: string) => void;
 
   // Annotations
@@ -235,32 +239,69 @@ const DEFAULT_BACKGROUND: CanvasBackground = {
 
 export const useCanvasStore = create<CanvasState & CanvasActions>()(
   temporal(
-    (set) => ({
+    (set, get) => ({
       canvasWidth: 1920,
       canvasHeight: 1080,
       padding: 64,
       background: DEFAULT_BACKGROUND,
       images: [],
+      imageLayout: null,
       annotations: [],
       privacyRegions: [],
       selectedId: null,
 
-      setCanvasSize: (width, height) => set({ canvasWidth: width, canvasHeight: height }),
-      setPadding: (padding) => set({ padding }),
+      setCanvasSize: (width, height) => {
+        if (!Number.isFinite(width) || !Number.isFinite(height)) return;
+        const state = get();
+        const canvasWidth = Math.max(100, Math.round(width)), canvasHeight = Math.max(100, Math.round(height));
+        if (canvasWidth === state.canvasWidth && canvasHeight === state.canvasHeight) return;
+        const padding = Math.min(state.padding, Math.floor(Math.min(canvasWidth, canvasHeight) / 4));
+        const images = resizeCanvasImages(state.images,
+          { width: state.canvasWidth, height: state.canvasHeight, padding: state.padding },
+          { width: canvasWidth, height: canvasHeight, padding }, state.imageLayout);
+        set({ canvasWidth, canvasHeight, padding, images });
+      },
+      setPadding: (value) => {
+        if (!Number.isFinite(value)) return;
+        const state = get();
+        const padding = Math.max(0, Math.min(value, Math.floor(Math.min(state.canvasWidth, state.canvasHeight) / 4)));
+        if (padding === state.padding) return;
+        const size = { width: state.canvasWidth, height: state.canvasHeight };
+        const images = resizeCanvasImages(state.images, { ...size, padding: state.padding }, { ...size, padding }, state.imageLayout);
+        set({ padding, images });
+      },
 
       setBackground: (bg) =>
         set((s) => ({ background: { ...s.background, ...bg } })),
 
-      addImage: (image) => set((s) => ({ images: [...s.images, image] })),
+      addImage: (image) => set((s) => ({ images: [...s.images, image], imageLayout: null })),
       updateImage: (id, updates) =>
         set((s) => ({
           images: s.images.map((img) =>
             img.id === id ? { ...img, ...updates } : img,
           ),
+          imageLayout: (["x", "y", "width", "height", "rotation"] as const).some((key) => key in updates) ? null : s.imageLayout,
         })),
+      applyImageLayout: (layout, spacing) => {
+        const state = get();
+        if (state.images.length < 2) return;
+        const placements = computeImageLayout(state.images, state.canvasWidth, state.canvasHeight, state.padding, layout, spacing, state.selectedId);
+        const imageLayout: ImageLayoutSettings = { kind: layout, spacing,
+          ...(layout === "featured" ? { featuredId: state.images.find((image) => image.id === state.selectedId)?.id ?? state.images[0]!.id } : {}) };
+        const images = state.images.map((image, index) => ({ ...image, ...placements[index]!, userResized: true }));
+        const unchanged = images.every((image, index) => {
+          const previous = state.images[index]!;
+          return previous.userResized && (["x", "y", "width", "height", "rotation"] as const)
+            .every((key) => Math.abs(image[key] - previous[key]) < 0.001);
+        });
+        // A single store update makes the whole composition one undo step.
+        if (!unchanged || state.imageLayout?.kind !== imageLayout.kind || state.imageLayout?.spacing !== spacing
+          || state.imageLayout?.featuredId !== imageLayout.featuredId) set({ images, imageLayout });
+      },
       removeImage: (id) =>
         set((s) => ({
           images: s.images.filter((img) => img.id !== id),
+          imageLayout: null,
           selectedId: s.selectedId === id ? null : s.selectedId,
         })),
 
@@ -343,6 +384,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
           if (!s.selectedId) return s;
           return {
             images: s.images.filter((i) => i.id !== s.selectedId),
+            imageLayout: s.images.some((image) => image.id === s.selectedId) ? null : s.imageLayout,
             annotations: s.annotations.filter((a) => a.id !== s.selectedId),
             privacyRegions: s.privacyRegions.filter(
               (r) => r.id !== s.selectedId,
@@ -359,6 +401,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
         padding: state.padding,
         background: state.background,
         images: state.images,
+        imageLayout: state.imageLayout,
         annotations: state.annotations,
         privacyRegions: state.privacyRegions,
       }),

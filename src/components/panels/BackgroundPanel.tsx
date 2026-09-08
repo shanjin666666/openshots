@@ -1,7 +1,8 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { open } from "@tauri-apps/plugin-dialog";
-import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl } from "../../ipc/capture";
+import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl, type SystemWallpaper } from "../../ipc/capture";
 
 // macOS-style vibrant gradients
 const GRADIENT_PRESETS: [string, string][] = [
@@ -37,23 +38,33 @@ const SOLID_PRESETS = [
 type BgType = "solid" | "linear-gradient" | "radial-gradient" | "image";
 
 export default function BackgroundPanel() {
+  useLocale();
   const background = useCanvasStore((s) => s.background);
   const setBackground = useCanvasStore((s) => s.setBackground);
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const setCanvasSize = useCanvasStore((s) => s.setCanvasSize);
-  const [wallpapers, setWallpapers] = useState<{ name: string; path: string; thumb?: string }[]>([]);
+  const [wallpapers, setWallpapers] = useState<(SystemWallpaper & { thumb?: string })[]>([]);
   const [loadingWp, setLoadingWp] = useState<string | null>(null);
+  const [wallpaperError, setWallpaperError] = useState("");
+  const [backgroundSize, setBackgroundSize] = useState<{ src: string; width: number; height: number } | null>(null);
+
+  useEffect(() => { setWallpaperError(""); }, [background.imageSrc]);
   const [widthInput, setWidthInput] = useState(String(canvasWidth));
   const [heightInput, setHeightInput] = useState(String(canvasHeight));
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setWidthInput(String(canvasWidth));
-  }, [canvasWidth]);
-  useEffect(() => {
     setHeightInput(String(canvasHeight));
-  }, [canvasHeight]);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [canvasWidth, canvasHeight]);
+
+  const resizeCanvas = (width: number, height: number) => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setCanvasSize(width, height);
+  };
 
   const handleDimensionChange = (newW: string, newH: string) => {
     setWidthInput(newW);
@@ -62,7 +73,7 @@ export default function BackgroundPanel() {
     debounceRef.current = setTimeout(() => {
       const w = Math.min(Math.max(Number(newW) || 100, 100), 4000);
       const h = Math.min(Math.max(Number(newH) || 100, 100), 4000);
-      setCanvasSize(w, h);
+      resizeCanvas(w, h);
     }, 300);
   };
 
@@ -72,7 +83,7 @@ export default function BackgroundPanel() {
       listSystemWallpapers()
         .then(async (wp) => {
           // Set list immediately with names
-          const items = wp.map(([name, path]) => ({ name, path }));
+          const items = wp;
           setWallpapers(items);
 
           // Load thumbnails progressively in batches of 4
@@ -80,7 +91,7 @@ export default function BackgroundPanel() {
             const batch = items.slice(i, i + 4);
             const results = await Promise.allSettled(
               batch.map(async (item) => {
-                const thumb = await convertHeicThumbnail(item.path);
+                const thumb = await convertHeicThumbnail(item.thumbnailPath);
                 return { path: item.path, thumb };
               }),
             );
@@ -103,11 +114,19 @@ export default function BackgroundPanel() {
 
   const handleSelectWallpaper = async (path: string) => {
     setLoadingWp(path);
+    setWallpaperError("");
+    const previousBackground = useCanvasStore.getState().background;
     try {
       const dataUrl = await convertHeicToDataUrl(path);
-      setBackground({ type: "image", imageSrc: dataUrl });
+      setWallpapers((items) => items.map((wp) => wp.path === path ? { ...wp, available: true } : wp));
+      if (useCanvasStore.getState().background === previousBackground) {
+        setBackground({ type: "image", imageSrc: dataUrl });
+      }
     } catch (err) {
       console.error("Failed to load wallpaper:", err);
+      setWallpaperError(String(err).includes("WALLPAPER_ORIGINAL_NOT_AVAILABLE")
+        ? "Download this wallpaper in macOS System Settings → Wallpaper, then select it again."
+        : "Unable to load the full-resolution wallpaper. Please try again.");
     } finally {
       setLoadingWp(null);
     }
@@ -118,7 +137,7 @@ export default function BackgroundPanel() {
       const filePath = await open({
         multiple: false,
         filters: [
-          { name: "Images", extensions: ["png", "jpg", "jpeg", "webp"] },
+          { name: t("Images"), extensions: ["png", "jpg", "jpeg", "webp"] },
         ],
       });
       if (filePath) {
@@ -131,10 +150,10 @@ export default function BackgroundPanel() {
   };
 
   const types: { value: BgType; label: string }[] = [
-    { value: "solid", label: "Solid" },
-    { value: "linear-gradient", label: "Linear" },
-    { value: "radial-gradient", label: "Radial" },
-    { value: "image", label: "Custom" },
+    { value: "solid", label: t("Solid") },
+    { value: "linear-gradient", label: t("Linear") },
+    { value: "radial-gradient", label: t("Radial") },
+    { value: "image", label: t("Custom") },
   ];
 
   const isGradient = background.type === "linear-gradient" || background.type === "radial-gradient";
@@ -142,7 +161,7 @@ export default function BackgroundPanel() {
   return (
     <div className="space-y-3">
       <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        Background
+        {t("Background")}
       </h3>
 
       {/* Type selector */}
@@ -169,19 +188,28 @@ export default function BackgroundPanel() {
             onClick={() => void handleUploadBg()}
             className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
           >
-            {background.imageSrc ? "Change image" : "Upload image"}
+            {background.imageSrc ? t("Change image") : t("Upload image")}
           </button>
           {background.imageSrc && (
-            <div
-              className="h-16 rounded-md border border-zinc-700/50 bg-cover bg-center"
-              style={{ backgroundImage: `url(${background.imageSrc})` }}
-            />
+            <div className="space-y-1.5">
+              <img src={background.imageSrc} alt={t("Background")}
+                className="h-16 w-full rounded-md border border-zinc-700/50 object-cover"
+                onLoad={(event) => {
+                  const image = event.currentTarget;
+                  setBackgroundSize({ src: image.src, width: image.naturalWidth, height: image.naturalHeight });
+                }} />
+              {backgroundSize?.src === background.imageSrc && <div className="text-[11px] text-zinc-500">
+                {t("Background image: {width} × {height} px", backgroundSize)}
+                {(backgroundSize.width < canvasWidth || backgroundSize.height < canvasHeight) &&
+                  <p className="mt-1 text-amber-300">{t("This background is smaller than the canvas. Choose a higher-resolution original to avoid blur.")}</p>}
+              </div>}
+            </div>
           )}
 
           {/* System wallpapers */}
           {wallpapers.length > 0 && (
             <div>
-              <p className="text-[11px] text-zinc-500 mb-2">System Wallpapers</p>
+              <p className="text-[11px] text-zinc-500 mb-2">{t("System Wallpapers")}</p>
               <div className="grid grid-cols-3 gap-1 max-h-48 overflow-y-auto pr-0.5">
                 {wallpapers.map((wp) => (
                   <button
@@ -193,7 +221,8 @@ export default function BackgroundPanel() {
                         ? "border-zinc-400 opacity-70"
                         : "border-zinc-700/40 hover:border-zinc-400"
                     }`}
-                    title={wp.name}
+                    title={wp.available ? wp.name : `${wp.name} · ${t("Not downloaded")}`}
+                    aria-label={wp.available ? wp.name : `${wp.name} · ${t("Not downloaded")}`}
                   >
                     {wp.thumb ? (
                       <img
@@ -208,9 +237,10 @@ export default function BackgroundPanel() {
                         </span>
                       </div>
                     )}
+                    {!wp.available && <span className="absolute bottom-0 inset-x-0 bg-black/65 text-[9px] text-zinc-200 text-center">{t("Not downloaded")}</span>}
                     {loadingWp === wp.path && (
                       <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                        <span className="text-[10px] text-white animate-pulse">Loading</span>
+                        <span className="text-[10px] text-white animate-pulse">{t("Loading")}</span>
                       </div>
                     )}
                   </button>
@@ -218,6 +248,7 @@ export default function BackgroundPanel() {
               </div>
             </div>
           )}
+          {wallpaperError && <p role="alert" className="text-xs text-amber-300">{t(wallpaperError)}</p>}
         </div>
       )}
 
@@ -254,7 +285,7 @@ export default function BackgroundPanel() {
       {/* Custom color input */}
       {background.type !== "image" && (
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500">Color</label>
+          <label className="text-[11px] text-zinc-500">{t("Color")}</label>
           <input
             type="color"
             value={background.type === "solid" ? background.color : background.gradientColors[0]}
@@ -285,7 +316,7 @@ export default function BackgroundPanel() {
       {/* Gradient angle */}
       {isGradient && (
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Angle</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Angle")}</label>
           <input
             type="range"
             min={0}
@@ -302,7 +333,7 @@ export default function BackgroundPanel() {
 
       {/* Blur */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Blur</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Blur")}</label>
         <input
           type="range"
           min={0}
@@ -318,7 +349,7 @@ export default function BackgroundPanel() {
 
       {/* Grain */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Grain</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Grain")}</label>
         <input
           type="range"
           min={0}
@@ -334,9 +365,9 @@ export default function BackgroundPanel() {
 
       {/* Canvas Size */}
       <div className="border-t border-zinc-800/60 pt-3 mt-3">
-        <p className="text-[11px] font-medium text-zinc-500 tracking-wide mb-2">Canvas Size</p>
+        <p className="text-[11px] font-medium text-zinc-500 tracking-wide mb-2">{t("Canvas Size")}</p>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] text-zinc-500 w-6 shrink-0">W</span>
+          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Width")}</span>
           <input
             type="number"
             min={100}
@@ -345,7 +376,7 @@ export default function BackgroundPanel() {
             onChange={(e) => handleDimensionChange(e.target.value, heightInput)}
             className="w-full px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
           />
-          <span className="text-[11px] text-zinc-500 w-6 shrink-0">H</span>
+          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Height")}</span>
           <input
             type="number"
             min={100}

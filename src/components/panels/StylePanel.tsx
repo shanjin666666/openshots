@@ -1,16 +1,16 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { useToolStore, COLOR_PRESETS } from "../../stores/tool.store";
 import { extractDominantColor } from "../../lib/colorAnalysis";
-import { computeFanLayout } from "../../lib/fanLayout";
+import AutoLayoutControls from "../editor/AutoLayoutControls";
 
 export default function StylePanel() {
+  useLocale();
   const images = useCanvasStore((s) => s.images);
   const selectedId = useCanvasStore((s) => s.selectedId);
   const updateImage = useCanvasStore((s) => s.updateImage);
   const padding = useCanvasStore((s) => s.padding);
   const setPadding = useCanvasStore((s) => s.setPadding);
-  const canvasWidth = useCanvasStore((s) => s.canvasWidth);
-  const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const privacyRegions = useCanvasStore((s) => s.privacyRegions);
   const updatePrivacyRegion = useCanvasStore((s) => s.updatePrivacyRegion);
 
@@ -22,20 +22,6 @@ export default function StylePanel() {
   const selected = images.find((img) => img.id === selectedId);
   const selectedPrivacy = privacyRegions.find((r) => r.id === selectedId);
   const selectedAnnotation = annotations.find((a) => a.id === selectedId);
-
-  const handleFanLayout = () => {
-    const positions = computeFanLayout(images.length, canvasWidth, canvasHeight);
-    const store = useCanvasStore.getState();
-    images.forEach((img, i) => {
-      if (positions[i]) {
-        store.updateImage(img.id, {
-          x: positions[i].x,
-          y: positions[i].y,
-          rotation: positions[i].rotation,
-        });
-      }
-    });
-  };
 
   const handleAutoInsetBorder = () => {
     if (!selected) return;
@@ -53,12 +39,14 @@ export default function StylePanel() {
   return (
     <div className="space-y-3">
       <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        Style
+        {t("Style")}
       </h3>
+
+      <AutoLayoutControls />
 
       {/* Padding */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Padding</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Padding")}</label>
         <input
           type="range"
           min={0}
@@ -72,26 +60,17 @@ export default function StylePanel() {
         </span>
       </div>
 
-      {/* Fan layout */}
-      {images.length > 1 && (
-        <button
-          onClick={handleFanLayout}
-          className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
-        >
-          Auto Fan Layout
-        </button>
-      )}
 
       {/* Selected image controls */}
       {selected && (
         <>
           <div className="border-t border-zinc-800/60 pt-3 mt-3">
-            <p className="text-[11px] text-zinc-500 mb-2">Selected Image</p>
+            <p className="text-[11px] text-zinc-500 mb-2">{t("Selected Image")}</p>
           </div>
 
           {/* Corner radius */}
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-zinc-500 w-12">Corners</label>
+            <label className="text-[11px] text-zinc-500 w-12">{t("Corners")}</label>
             <input
               type="range"
               min={0}
@@ -122,13 +101,13 @@ export default function StylePanel() {
                 }
                 className="rounded accent-zinc-400 focus-visible:ring-1 focus-visible:ring-zinc-500"
               />
-              <span className="text-[13px] text-zinc-300">Drop Shadow</span>
+              <span className="text-[13px] text-zinc-300">{t("Drop Shadow")}</span>
             </label>
 
             {selected.shadow.enabled && (
               <>
                 <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-zinc-500 w-12">Blur</label>
+                  <label className="text-[11px] text-zinc-500 w-12">{t("Blur")}</label>
                   <input
                     type="range"
                     min={0}
@@ -143,7 +122,7 @@ export default function StylePanel() {
                   />
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="text-[11px] text-zinc-500 w-12">Offset Y</label>
+                  <label className="text-[11px] text-zinc-500 w-12">{t("Offset Y")}</label>
                   <input
                     type="range"
                     min={-40}
@@ -177,7 +156,7 @@ export default function StylePanel() {
                 }
                 className="rounded accent-zinc-400 focus-visible:ring-1 focus-visible:ring-zinc-500"
               />
-              <span className="text-[13px] text-zinc-300">Inset Border</span>
+              <span className="text-[13px] text-zinc-300">{t("Inset Border")}</span>
             </label>
 
             {selected.insetBorder.enabled && (
@@ -185,7 +164,7 @@ export default function StylePanel() {
                 onClick={handleAutoInsetBorder}
                 className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
               >
-                Auto-match color
+                {t("Auto-match color")}
               </button>
             )}
           </div>
@@ -198,7 +177,7 @@ export default function StylePanel() {
               }
               className="flex-1 px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
             >
-              Flip H
+              {t("Flip H")}
             </button>
             <button
               onClick={() =>
@@ -206,7 +185,7 @@ export default function StylePanel() {
               }
               className="flex-1 px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
             >
-              Flip V
+              {t("Flip V")}
             </button>
           </div>
         </>
@@ -217,12 +196,12 @@ export default function StylePanel() {
         <>
           <div className="border-t border-zinc-800/60 pt-3 mt-3">
             <p className="text-[11px] text-zinc-500 mb-2">
-              {selectedPrivacy.type === "blur" ? "Blur" : "Pixelate"} Region
+              {selectedPrivacy.type === "blur" ? t("Blur") : t("Pixelate")} {t("Region")}
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-zinc-500 w-12">Intensity</label>
+            <label className="text-[11px] text-zinc-500 w-12">{t("Intensity")}</label>
             <input
               type="range"
               min={1}
@@ -241,7 +220,7 @@ export default function StylePanel() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-zinc-500 w-12">Opacity</label>
+            <label className="text-[11px] text-zinc-500 w-12">{t("Opacity")}</label>
             <input
               type="range"
               min={0}
@@ -260,7 +239,7 @@ export default function StylePanel() {
           </div>
 
           <div className="flex items-center gap-2">
-            <label className="text-[11px] text-zinc-500 w-12">Color</label>
+            <label className="text-[11px] text-zinc-500 w-12">{t("Color")}</label>
             <input
               type="color"
               value={selectedPrivacy.fill || (selectedPrivacy.type === "blur" ? "#d4d4d4" : "#a3a3a3")}
@@ -282,12 +261,12 @@ export default function StylePanel() {
       {selectedAnnotation && (
         <>
           <div className="border-t border-zinc-800/60 pt-3 mt-3">
-            <p className="text-[11px] font-medium text-zinc-500 tracking-wide mb-2">Annotation</p>
+            <p className="text-[11px] font-medium text-zinc-500 tracking-wide mb-2">{t("Annotation")}</p>
           </div>
 
           {/* Color row */}
           <div className="space-y-2">
-            <label className="text-[11px] text-zinc-500">Color</label>
+            <label className="text-[11px] text-zinc-500">{t("Color")}</label>
             <div className="flex flex-wrap gap-1 mt-1">
               {COLOR_PRESETS.map((color) => {
                 const currentColor = selectedAnnotation.type === "text" || selectedAnnotation.type === "callout"
@@ -329,7 +308,7 @@ export default function StylePanel() {
           {/* Stroke Width presets */}
           {(selectedAnnotation.type === "arrow" || selectedAnnotation.type === "rectangle" || selectedAnnotation.type === "ellipse") && (
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Stroke</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Stroke")}</label>
               <div className="flex gap-1">
                 {[1, 2, 4, 8].map((w) => (
                   <button
@@ -354,12 +333,12 @@ export default function StylePanel() {
           {/* Dash Pattern presets */}
           {(selectedAnnotation.type === "arrow" || selectedAnnotation.type === "rectangle" || selectedAnnotation.type === "ellipse") && (
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Dash</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Dash")}</label>
               <div className="flex gap-1">
                 {([
-                  { label: "Solid", value: undefined },
-                  { label: "Dashed", value: [10, 5] },
-                  { label: "Dotted", value: [2, 6] },
+                  { label: t("Solid line"), value: undefined },
+                  { label: t("Dashed"), value: [10, 5] },
+                  { label: t("Dotted"), value: [2, 6] },
                 ] as const).map((preset) => {
                   const currentDash = (selectedAnnotation as { dash?: number[] }).dash;
                   const isActive = preset.value === undefined
@@ -387,7 +366,7 @@ export default function StylePanel() {
           {selectedAnnotation.type === "speech-bubble" && (
             <>
               <div className="space-y-2">
-                <label className="text-[11px] text-zinc-500">Bubble Color</label>
+                <label className="text-[11px] text-zinc-500">{t("Bubble Color")}</label>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {COLOR_PRESETS.map((color) => (
                     <button
@@ -407,7 +386,7 @@ export default function StylePanel() {
           {/* Spotlight color handling */}
           {selectedAnnotation.type === "spotlight" && (
             <div className="space-y-2">
-              <label className="text-[11px] text-zinc-500">Overlay Color</label>
+              <label className="text-[11px] text-zinc-500">{t("Overlay Color")}</label>
               <div className="flex flex-wrap gap-1 mt-1">
                 {COLOR_PRESETS.map((color) => (
                   <button
@@ -427,7 +406,7 @@ export default function StylePanel() {
           {selectedAnnotation.type === "speech-bubble" && (
             <>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-zinc-500 w-12">Tail</label>
+                <label className="text-[11px] text-zinc-500 w-12">{t("Tail")}</label>
                 <div className="flex gap-1">
                   {(["top", "bottom", "left", "right"] as const).map((dir) => (
                     <button
@@ -445,7 +424,7 @@ export default function StylePanel() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-zinc-500 w-12">Font</label>
+                <label className="text-[11px] text-zinc-500 w-12">{t("Font")}</label>
                 <input
                   type="range"
                   min={10}
@@ -460,7 +439,7 @@ export default function StylePanel() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-zinc-500 w-12">Text</label>
+                <label className="text-[11px] text-zinc-500 w-12">{t("Text")}</label>
                 <div className="flex flex-wrap gap-1">
                   {["#1A1A1A", "#FFFFFF", "#E03E3E", "#2563EB", "#16A34A"].map((color) => (
                     <button
@@ -475,7 +454,7 @@ export default function StylePanel() {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-zinc-500 w-12">Fill</label>
+                <label className="text-[11px] text-zinc-500 w-12">{t("Fill")}</label>
                 <div className="flex flex-wrap gap-1">
                   {["#ffffff", "#1A1A1A", "#FEF3C7", "#DBEAFE", "#DCFCE7"].map((color) => (
                     <button
@@ -496,7 +475,7 @@ export default function StylePanel() {
           {selectedAnnotation.type === "spotlight" && (
             <>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-zinc-500 w-12">Opacity</label>
+                <label className="text-[11px] text-zinc-500 w-12">{t("Opacity")}</label>
                 <input
                   type="range"
                   min={0}
@@ -511,7 +490,7 @@ export default function StylePanel() {
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <label className="text-[11px] text-zinc-500 w-12">Radius</label>
+                <label className="text-[11px] text-zinc-500 w-12">{t("Radius")}</label>
                 <input
                   type="range"
                   min={0}
@@ -531,7 +510,7 @@ export default function StylePanel() {
           {/* Font Size -- text annotations only */}
           {selectedAnnotation.type === "text" && (
             <div className="flex items-center gap-2">
-              <label className="text-[11px] text-zinc-500 w-12">Size</label>
+              <label className="text-[11px] text-zinc-500 w-12">{t("Size")}</label>
               <input
                 type="range"
                 min={10}

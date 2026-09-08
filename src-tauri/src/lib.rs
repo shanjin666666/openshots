@@ -6,6 +6,7 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 mod commands;
+mod i18n;
 pub mod annotations;
 pub mod presets;
 pub mod processing;
@@ -33,21 +34,21 @@ impl Default for HotkeyConfig {
     }
 }
 
-fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+fn tray_menu(app: &tauri::AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
     let capture_region =
-        MenuItem::with_id(app, "capture-region", "Capture Region", true, None::<&str>)?;
+        MenuItem::with_id(app, "capture-region", i18n::text(app, "Capture Region", "区域截图"), true, None::<&str>)?;
     let capture_screen = MenuItem::with_id(
         app,
         "capture-screen",
-        "Capture Full Screen",
+        i18n::text(app, "Capture Full Screen", "全屏截图"),
         true,
         None::<&str>,
     )?;
     let capture_window_item =
-        MenuItem::with_id(app, "capture-window", "Capture Window", true, None::<&str>)?;
+        MenuItem::with_id(app, "capture-window", i18n::text(app, "Capture Window", "窗口截图"), true, None::<&str>)?;
     let sep = PredefinedMenuItem::separator(app)?;
-    let settings = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
-    let quit = MenuItem::with_id(app, "quit", "Quit OpenShots", true, None::<&str>)?;
+    let settings = MenuItem::with_id(app, "settings", i18n::text(app, "Settings", "设置"), true, None::<&str>)?;
+    let quit = MenuItem::with_id(app, "quit", i18n::text(app, "Quit OpenShots", "退出 OpenShots"), true, None::<&str>)?;
 
     let menu = Menu::with_items(
         app,
@@ -61,7 +62,24 @@ fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
         ],
     )?;
 
-    TrayIconBuilder::new()
+    Ok(menu)
+}
+
+fn refresh_tray_language(app: &tauri::AppHandle) -> Result<(), String> {
+    if let Some(tray) = app.tray_by_id("main") {
+        let recents = app.state::<commands::tray::RecentCaptureState>().0.lock().unwrap_or_else(|error| error.into_inner()).clone();
+        if let Some(recents) = recents {
+            commands::tray::update_tray_menu(app.clone(), recents)?;
+        } else {
+            tray.set_menu(Some(tray_menu(app).map_err(|e| e.to_string())?)).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn setup_tray(app: &tauri::AppHandle) -> tauri::Result<()> {
+    let menu = tray_menu(app)?;
+    TrayIconBuilder::with_id("main")
         .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -161,31 +179,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .manage(PlatformFlags { is_wayland })
-        .menu(|app| {
-            use tauri::menu::*;
-            let file_menu = SubmenuBuilder::new(app, "File")
-                .item(&MenuItem::with_id(app, "file-open", "Open Project…", true, Some("CmdOrCtrl+O"))?)
-                .item(&MenuItem::with_id(app, "file-save", "Save Project", true, Some("CmdOrCtrl+S"))?)
-                .separator()
-                .item(&MenuItem::with_id(app, "file-export", "Export…", true, Some("CmdOrCtrl+E"))?)
-                .separator()
-                .quit()
-                .build()?;
-            let edit_menu = SubmenuBuilder::new(app, "Edit")
-                .undo()
-                .redo()
-                .separator()
-                .cut()
-                .copy()
-                .paste()
-                .select_all()
-                .build()?;
-            let menu = MenuBuilder::new(app)
-                .item(&file_menu)
-                .item(&edit_menu)
-                .build()?;
-            Ok(menu)
-        })
+        .manage(i18n::LanguageState(std::sync::Mutex::new("zh-CN".to_owned())))
+        .manage(commands::tray::RecentCaptureState(std::sync::Mutex::new(None)))
         .on_menu_event(|app, event| {
             match event.id().as_ref() {
                 "file-open" => { let _ = app.emit("menu:open-project", ()); }
@@ -196,6 +191,7 @@ pub fn run() {
         })
         .setup(move |app| {
             let handle = app.handle();
+            i18n::initialize(handle)?;
             setup_tray(handle)?;
             register_shortcuts(handle, &HotkeyConfig::default());
             handle.emit("platform:flags", PlatformFlags { is_wayland })?;
@@ -208,6 +204,9 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            i18n::set_language,
+            commands::batch::save_batch_image,
+            commands::batch::open_batch_folder,
             commands::capture::capture_fullscreen,
             commands::capture::capture_all_monitors,
             commands::capture::list_windows,

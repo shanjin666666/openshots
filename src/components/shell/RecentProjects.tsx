@@ -1,3 +1,4 @@
+import { t, useLocale, getLocale } from "../../lib/i18n";
 import { useEffect, useState, useCallback } from "react";
 import {
   getRecentProjects,
@@ -16,13 +17,13 @@ function formatRelativeDate(dateStr: string): string {
   const diffHours = Math.floor(diffMins / 60);
   const diffDays = Math.floor(diffHours / 24);
 
-  if (diffSecs < 60) return "Just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays === 1) return "Yesterday";
-  if (diffDays < 7) return `${diffDays}d ago`;
+  if (diffSecs < 60) return t("Just now");
+  if (diffMins < 60) return t("{count}m ago", { count: diffMins });
+  if (diffHours < 24) return t("{count}h ago", { count: diffHours });
+  if (diffDays === 1) return t("Yesterday");
+  if (diffDays < 7) return t("{count}d ago", { count: diffDays });
 
-  return date.toLocaleDateString(undefined, {
+  return date.toLocaleDateString(getLocale(), {
     month: "short",
     day: "numeric",
   });
@@ -34,6 +35,7 @@ function displayName(name: string): string {
 }
 
 export default function RecentProjects() {
+  useLocale();
   const [projects, setProjects] = useState<RecentProject[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -71,7 +73,7 @@ export default function RecentProjects() {
     <div className="w-full max-w-sm">
       <div className="flex items-center gap-3 w-full mb-2">
         <div className="flex-1 h-px bg-zinc-800/60" />
-        <span className="text-[11px] text-zinc-600">recent projects</span>
+        <span className="text-[11px] text-zinc-600">{t("recent projects")}</span>
         <div className="flex-1 h-px bg-zinc-800/60" />
       </div>
 

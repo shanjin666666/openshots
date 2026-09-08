@@ -1,3 +1,4 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../stores/canvas.store";
 
@@ -26,6 +27,7 @@ const zOrderItems: MenuItem[] = [
 ];
 
 export default function ContextMenu({ x, y, elementId, onClose, onRemoveBackground }: ContextMenuProps) {
+  useLocale();
   const isImage = useCanvasStore.getState().images.some((img) => img.id === elementId);
   const menuRef = useRef<HTMLDivElement>(null);
   const [focusedIndex, setFocusedIndex] = useState(0);
@@ -34,7 +36,7 @@ export default function ContextMenu({ x, y, elementId, onClose, onRemoveBackgrou
   const allItems: MenuItem[] = [
     ...zOrderItems,
     ...(isImage && onRemoveBackground
-      ? [{ label: "Remove Background", shortcut: "", action: "remove-bg" }]
+      ? [{ label: t("Remove Background"), shortcut: "", action: "remove-bg" }]
       : []),
   ];
 
@@ -111,7 +113,7 @@ export default function ContextMenu({ x, y, elementId, onClose, onRemoveBackgrou
                   focusedIndex === currentIndex ? "bg-zinc-800" : ""
                 }`}
               >
-                <span>{item.label}</span>
+                <span>{t(item.label)}</span>
                 <span className="text-zinc-500 text-[11px] ml-4">{item.shortcut}</span>
               </button>
             </div>
@@ -126,7 +128,7 @@ export default function ContextMenu({ x, y, elementId, onClose, onRemoveBackgrou
                 focusedIndex === itemIndex ? "bg-zinc-800" : ""
               }`}
             >
-              <span>Remove Background</span>
+              <span>{t("Remove Background")}</span>
             </button>
           </>
         )}

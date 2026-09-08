@@ -1,6 +1,7 @@
+import { t, useLocale } from "../../lib/i18n";
 import { useState } from "react";
 import { useCanvasStore } from "../../stores/canvas.store";
-import { exportCanvas, type ExportFormat } from "../../ipc/export";
+import { exportCanvas, type ExportFormat, type ExportStatus } from "../../ipc/export";
 import { saveProject } from "../../lib/project-file";
 import { shareFile } from "../../ipc/share";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
@@ -12,11 +13,12 @@ interface ExportPanelProps {
 }
 
 export default function ExportPanel({ stageRef }: ExportPanelProps) {
+  useLocale();
   const [format, setFormat] = useState<ExportFormat>("png");
   const [quality, setQuality] = useState(90);
   const [scale, setScale] = useState(1);
   const [exporting, setExporting] = useState(false);
-  const [lastExport, setLastExport] = useState<string | null>(null);
+  const [lastExport, setLastExport] = useState<ExportStatus | null>(null);
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
 
@@ -57,7 +59,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
         { format, quality, scale: 1 },
       );
 
-      if (result) setLastExport(result);
+      if (result) setLastExport({ kind: "image", path: result });
     } catch (err) {
       console.error("Export failed:", err);
     } finally {
@@ -79,7 +81,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
       for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
       const tauriImage = await Image.fromBytes(bytes);
       await writeImage(tauriImage);
-      setLastExport("Copied to clipboard!");
+      setLastExport({ kind: "copied" });
       setTimeout(() => setLastExport(null), 2000);
     } catch (err) {
       console.error("Copy to clipboard failed:", err);
@@ -89,7 +91,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
   return (
     <div className="space-y-3">
       <h3 className="text-[11px] font-medium text-zinc-500 tracking-wide">
-        Export
+        {t("Export")}
       </h3>
 
       {/* Format */}
@@ -112,7 +114,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
       {/* Quality */}
       {format !== "png" && (
         <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">Quality</label>
+          <label className="text-[11px] text-zinc-500 w-12">{t("Quality")}</label>
           <input
             type="range"
             min={10}
@@ -129,7 +131,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
 
       {/* Scale */}
       <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">Scale</label>
+        <label className="text-[11px] text-zinc-500 w-12">{t("Scale")}</label>
         <div className="flex gap-1">
           {[1, 2, 3].map((s) => (
             <button
@@ -148,7 +150,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
       </div>
 
       <p className="text-[11px] text-zinc-500">
-        Output: {canvasWidth * scale} × {canvasHeight * scale}
+        {t("Output:")} {canvasWidth * scale} × {canvasHeight * scale}
       </p>
 
       {/* Export buttons */}
@@ -157,14 +159,14 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
         disabled={exporting}
         className="w-full px-3 py-2 text-[13px] font-medium rounded-md bg-white text-zinc-900 hover:bg-zinc-200 disabled:opacity-40 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
       >
-        {exporting ? "Exporting..." : "Save to File"}
+        {exporting ? t("Exporting...") : "Save to File"}
       </button>
 
       <button
         onClick={handleCopyToClipboard}
         className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
       >
-        Copy to Clipboard
+        {t("Copy to Clipboard")}
       </button>
 
       {/* Divider */}
@@ -175,7 +177,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
           try {
             const path = await saveProject();
             if (path) {
-              setLastExport(`Saved: ${path}`);
+              setLastExport({ kind: "project", path });
               setTimeout(() => setLastExport(null), 3000);
             }
           } catch (err) {
@@ -184,26 +186,26 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
         }}
         className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none"
       >
-        Save as Project
+        {t("Save as Project")}
       </button>
 
       <button
         onClick={async () => {
-          if (!lastExport || lastExport.startsWith("Copied") || lastExport.startsWith("Saved")) return;
+          if (lastExport?.kind !== "image") return;
           try {
-            await shareFile(lastExport);
+            await shareFile(lastExport.path);
           } catch (err) {
             console.error("Share failed:", err);
           }
         }}
-        disabled={!lastExport || lastExport.startsWith("Copied") || lastExport.startsWith("Saved")}
+        disabled={lastExport?.kind !== "image"}
         className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150 focus-visible:ring-1 focus-visible:ring-zinc-500 focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900 outline-none disabled:opacity-40 disabled:cursor-not-allowed"
       >
-        Share Last Export
+        {t("Share Last Export")}
       </button>
 
       {lastExport && (
-        <p className="text-[11px] text-green-400/80 truncate">{lastExport}</p>
+        <p className="text-[11px] text-green-400/80 truncate">{lastExport.kind === "copied" ? t("Copied to clipboard!") : lastExport.kind === "project" ? t("Saved: {path}", { path: lastExport.path }) : lastExport.path}</p>
       )}
     </div>
   );
