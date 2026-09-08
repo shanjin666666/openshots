@@ -228,7 +228,123 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
 
   return (
     <div className="p-4 space-y-5">
-      {/* Section 1: Background */}
+      {/* Canvas Size */}
+      <Section title={t("Canvas Size")} defaultOpen>
+        <p className="text-[11px] leading-relaxed text-zinc-500">{t("Images automatically fit when the canvas size or aspect ratio changes.")}</p>
+        {/* Aspect ratio buttons */}
+        <div className="grid grid-cols-3 gap-1">
+          {ASPECT_RATIOS.map((preset) => {
+            const size = canvasSize(preset);
+            const isActive = Math.abs(currentRatio - preset.ratio) < 0.01;
+            return (
+              <button
+                key={preset.label}
+                onClick={() => resizeCanvas(size.width, size.height)}
+                className={`px-2 py-1.5 text-[12px] rounded-md transition-colors duration-150 ${
+                  isActive
+                    ? "bg-zinc-100 text-zinc-900"
+                    : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/60"
+                }`}
+              >
+                {preset.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* W/H inputs */}
+        <div className="flex items-center gap-2">
+          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Width")}</span>
+          <input
+            type="number"
+            min={100}
+            max={4000}
+            aria-label={t("Width")}
+            value={widthInput}
+            onChange={(e) => handleDimensionChange(e.target.value, heightInput)}
+            className="w-full min-w-0 px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
+          />
+          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Height")}</span>
+          <input
+            type="number"
+            min={100}
+            max={4000}
+            aria-label={t("Height")}
+            value={heightInput}
+            onChange={(e) => handleDimensionChange(widthInput, e.target.value)}
+            className="w-full min-w-0 px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
+          />
+        </div>
+
+        {/* Padding */}
+        <div className="flex items-center gap-2">
+          <label className="text-[11px] text-zinc-500 w-12">{t("Padding")}</label>
+          <input
+            type="range"
+            min={0}
+            max={200}
+            value={padding}
+            onChange={(e) => setPadding(Number(e.target.value))}
+            className="flex-1 accent-zinc-400"
+          />
+          <span className="text-[11px] text-zinc-500 w-7 text-right">{padding}</span>
+        </div>
+      </Section>
+
+      {/* Presets */}
+      <Section title={t("Presets")} defaultOpen={false}>
+        <p className="text-[11px] text-zinc-500">{t("Built-in presets")}</p>
+        {BUILTIN_IMAGE_PRESETS.map((preset) => <button key={preset.name} onClick={() => handleApplyPreset(preset)}
+          className="w-full flex items-center gap-2 rounded-md bg-zinc-800/40 p-2 text-left text-[13px] text-zinc-300 hover:bg-zinc-800">
+          <img src={preset.background.imageSrc!} alt="" className="w-10 h-7 object-cover rounded" />{t(preset.name)}
+        </button>)}
+        <p className="text-[11px] text-zinc-500">{t("Saved presets")}</p>
+        <button
+          onClick={handleSavePreset}
+          className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150"
+        >
+          {t("Save Current as Preset")}
+        </button>
+
+        {presets.length === 0 && (
+          <p className="text-[11px] text-zinc-500">{t("No saved presets")}</p>
+        )}
+
+        <div className="space-y-1">
+          {presets.map((preset) => (
+            <div
+              key={preset.id}
+              className="flex items-center gap-2 px-2 py-2 rounded-md bg-zinc-800/40 group"
+            >
+              <div
+                className="w-5 h-4 rounded-sm shrink-0 border border-zinc-700/50"
+                style={{
+                  background:
+                    preset.background.type === "image" && preset.background.imageSrc
+                      ? `center / cover url(${preset.background.imageSrc})`
+                      : preset.background.type === "solid"
+                      ? preset.background.color
+                      : `linear-gradient(${preset.background.gradientAngle}deg, ${preset.background.gradientColors[0]}, ${preset.background.gradientColors[1]})`,
+                }}
+              />
+              <button
+                onClick={() => handleApplyPreset(preset)}
+                className="flex-1 text-left text-[13px] text-zinc-400 hover:text-zinc-100 truncate transition-colors duration-150"
+              >
+                {preset.name}
+              </button>
+              <button
+                onClick={() => removePreset(preset.id)}
+                className="text-zinc-600 hover:text-red-400 text-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+              >
+                x
+              </button>
+            </div>
+          ))}
+        </div>
+      </Section>
+
+      {/* Background */}
       <Section title={t("Background")} defaultOpen>
         <div>
           <p className="text-[11px] text-zinc-500 mb-2">{t("Built-in backgrounds")}</p>
@@ -424,122 +540,6 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
             className="flex-1 accent-zinc-400"
           />
           <span className="text-[11px] text-zinc-500 w-7 text-right">{background.grain}</span>
-        </div>
-      </Section>
-
-      {/* Section 2: Canvas Size */}
-      <Section title={t("Canvas Size")} defaultOpen>
-        <p className="text-[11px] leading-relaxed text-zinc-500">{t("Images automatically fit when the canvas size or aspect ratio changes.")}</p>
-        {/* Aspect ratio buttons */}
-        <div className="grid grid-cols-3 gap-1">
-          {ASPECT_RATIOS.map((preset) => {
-            const size = canvasSize(preset);
-            const isActive = Math.abs(currentRatio - preset.ratio) < 0.01;
-            return (
-              <button
-                key={preset.label}
-                onClick={() => resizeCanvas(size.width, size.height)}
-                className={`px-2 py-1.5 text-[12px] rounded-md transition-colors duration-150 ${
-                  isActive
-                    ? "bg-zinc-100 text-zinc-900"
-                    : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/60"
-                }`}
-              >
-                {preset.label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* W/H inputs */}
-        <div className="flex items-center gap-2">
-          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Width")}</span>
-          <input
-            type="number"
-            min={100}
-            max={4000}
-            aria-label={t("Width")}
-            value={widthInput}
-            onChange={(e) => handleDimensionChange(e.target.value, heightInput)}
-            className="w-full min-w-0 px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
-          />
-          <span className="text-[11px] text-zinc-500 w-6 shrink-0">{t("Height")}</span>
-          <input
-            type="number"
-            min={100}
-            max={4000}
-            aria-label={t("Height")}
-            value={heightInput}
-            onChange={(e) => handleDimensionChange(widthInput, e.target.value)}
-            className="w-full min-w-0 px-2 py-1 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 border border-zinc-700/50 focus:outline-none focus:border-zinc-500"
-          />
-        </div>
-
-        {/* Padding */}
-        <div className="flex items-center gap-2">
-          <label className="text-[11px] text-zinc-500 w-12">{t("Padding")}</label>
-          <input
-            type="range"
-            min={0}
-            max={200}
-            value={padding}
-            onChange={(e) => setPadding(Number(e.target.value))}
-            className="flex-1 accent-zinc-400"
-          />
-          <span className="text-[11px] text-zinc-500 w-7 text-right">{padding}</span>
-        </div>
-      </Section>
-
-      {/* Section 3: Presets */}
-      <Section title={t("Presets")} defaultOpen={false}>
-        <p className="text-[11px] text-zinc-500">{t("Built-in presets")}</p>
-        {BUILTIN_IMAGE_PRESETS.map((preset) => <button key={preset.name} onClick={() => handleApplyPreset(preset)}
-          className="w-full flex items-center gap-2 rounded-md bg-zinc-800/40 p-2 text-left text-[13px] text-zinc-300 hover:bg-zinc-800">
-          <img src={preset.background.imageSrc!} alt="" className="w-10 h-7 object-cover rounded" />{t(preset.name)}
-        </button>)}
-        <p className="text-[11px] text-zinc-500">{t("Saved presets")}</p>
-        <button
-          onClick={handleSavePreset}
-          className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150"
-        >
-          {t("Save Current as Preset")}
-        </button>
-
-        {presets.length === 0 && (
-          <p className="text-[11px] text-zinc-500">{t("No saved presets")}</p>
-        )}
-
-        <div className="space-y-1">
-          {presets.map((preset) => (
-            <div
-              key={preset.id}
-              className="flex items-center gap-2 px-2 py-2 rounded-md bg-zinc-800/40 group"
-            >
-              <div
-                className="w-5 h-4 rounded-sm shrink-0 border border-zinc-700/50"
-                style={{
-                  background:
-                    preset.background.type === "image" && preset.background.imageSrc
-                      ? `center / cover url(${preset.background.imageSrc})`
-                      : preset.background.type === "solid"
-                      ? preset.background.color
-                      : `linear-gradient(${preset.background.gradientAngle}deg, ${preset.background.gradientColors[0]}, ${preset.background.gradientColors[1]})`,
-                }}
-              />
-              <button
-                onClick={() => handleApplyPreset(preset)}
-                className="flex-1 text-left text-[13px] text-zinc-400 hover:text-zinc-100 truncate transition-colors duration-150"
-              >
-                {preset.name}
-              </button>
-              <button
-                onClick={() => removePreset(preset.id)}
-                className="text-zinc-600 hover:text-red-400 text-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-              >
-                x
-              </button>
-            </div>
-          ))}
         </div>
       </Section>
     </div>
