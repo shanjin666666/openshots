@@ -7,6 +7,7 @@ import { shareFile } from "../../ipc/share";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
 import { Image } from "@tauri-apps/api/image";
 import Konva from "konva";
+import { exportStageImage } from "../../lib/export-stage";
 
 interface ExportPanelProps {
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -32,7 +33,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
       const currentZoomScale = stage.scaleX();
       const exportPixelRatio = scale / currentZoomScale;
 
-      const dataUrl = stage.toDataURL({
+      const dataUrl = exportStageImage(stage, {
         pixelRatio: exportPixelRatio,
         mimeType: format === "png" ? "image/png" : "image/jpeg",
         quality: quality / 100,
@@ -74,7 +75,7 @@ export default function ExportPanel({ stageRef }: ExportPanelProps) {
     try {
       const currentScale = stage.scaleX();
       const pixelRatio = scale / currentScale;
-      const dataUrl = stage.toDataURL({ pixelRatio, mimeType: "image/png" });
+      const dataUrl = exportStageImage(stage, { pixelRatio, mimeType: "image/png" });
       const base64 = dataUrl.split(",")[1] ?? "";
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);

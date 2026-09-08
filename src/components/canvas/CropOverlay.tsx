@@ -1,5 +1,6 @@
 import { Layer, Rect, Line } from "react-konva";
 import Konva from "konva";
+import { EDITOR_OVERLAY_NAME } from "../../lib/export-stage";
 
 export interface CropRect {
   x: number;
@@ -240,7 +241,7 @@ export default function CropOverlay({
   ];
 
   return (
-    <Layer>
+    <Layer name={EDITOR_OVERLAY_NAME}>
       {/* Mask: 4 dark rects around the crop box */}
       <Rect x={0} y={0} width={canvasWidth} height={cy} fill={MASK_FILL} listening={false} />
       <Rect x={0} y={cy + ch} width={canvasWidth} height={canvasHeight - (cy + ch)} fill={MASK_FILL} listening={false} />

@@ -1,4 +1,5 @@
 import { Layer, Line } from "react-konva";
+import { EDITOR_OVERLAY_NAME } from "../../lib/export-stage";
 
 export interface Guide {
   lineGuide: number; // position of the line (x or y coordinate)
@@ -17,7 +18,7 @@ export default function GuidesLayer({
   canvasHeight,
 }: GuidesLayerProps) {
   return (
-    <Layer listening={false}>
+    <Layer name={EDITOR_OVERLAY_NAME} listening={false}>
       {guides.map((guide, i) => {
         if (guide.orientation === "V") {
           return (

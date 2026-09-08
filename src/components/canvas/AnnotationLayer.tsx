@@ -1,4 +1,5 @@
 import { Layer, Arrow, Rect, Ellipse, Text, Circle, Group, Line, Shape, Transformer } from "react-konva";
+import { EDITOR_OVERLAY_NAME } from "../../lib/export-stage";
 import { useCanvasStore, type AnnotationShape, type SpeechBubbleAnnotation } from "../../stores/canvas.store";
 import { useRef, useEffect, useState, useCallback } from "react";
 import Konva from "konva";
@@ -445,6 +446,7 @@ export default function AnnotationLayer() {
             />
             {/* Visible border around the cutout for selection */}
             <Rect
+              name={EDITOR_OVERLAY_NAME}
               width={shape.width}
               height={shape.height}
               stroke="rgba(255,255,255,0.3)"
