@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Group, Image as KonvaImage, Rect, Transformer } from "react-konva";
+import { Group, Image as KonvaImage, Rect, Shape, Transformer } from "react-konva";
 import Konva from "konva";
 import type { CanvasImage } from "../../../stores/canvas.store";
 import { useCanvasStore } from "../../../stores/canvas.store";
@@ -8,6 +8,7 @@ import { WINDOW_CHROME_FRAMES, DEVICE_MOCKUP_FRAMES } from "../../composition/fr
 import { WindowChrome } from "../../composition/WindowChrome";
 import { DeviceMockup } from "../../composition/DeviceMockup";
 import type { Guide } from "../GuidesLayer";
+import { drawShadowOnly } from "../../../lib/shadow-render";
 
 const SNAP_THRESHOLD = 8; // per D-10
 
@@ -188,7 +189,7 @@ export default function ScreenshotNode({
   };
 
   // Effective corner radius: disabled when device frame is active
-  const effectiveCornerRadius = hasDevice ? 0 : data.cornerRadius;
+  const effectiveCornerRadius = hasDevice ? 0 : Math.max(0, Math.min(data.cornerRadius, displayWidth / 2, displayHeight / 2));
 
   // Render the image content (shared between framed and unframed)
   const renderImageContent = (offsetX: number, offsetY: number) => (
@@ -248,27 +249,6 @@ export default function ScreenshotNode({
 
   return (
     <>
-      {/* Shadow -- rendered as a separate group OUTSIDE the main group
-          so it isn't clipped or affected by the image group structure */}
-      {data.shadow.enabled && (
-        <Rect
-          x={data.x - totalW / 2}
-          y={data.y - totalH / 2}
-          width={totalW}
-          height={totalH}
-          cornerRadius={hasChrome ? WINDOW_CHROME_FRAMES[frameVariant as "macos" | "windows"].borderRadius : hasDevice ? DEVICE_MOCKUP_FRAMES[frameVariant as "iphone" | "ipad" | "macbook"].bezelRadius : effectiveCornerRadius}
-          fill="#000"
-          opacity={0}
-          shadowEnabled
-          shadowColor={data.shadow.color}
-          shadowBlur={data.shadow.blur}
-          shadowOffsetX={data.shadow.offsetX}
-          shadowOffsetY={data.shadow.offsetY}
-          shadowOpacity={1}
-          listening={false}
-        />
-      )}
-
       <Group
         ref={groupRef}
         id={data.id}
@@ -287,6 +267,19 @@ export default function ScreenshotNode({
         onDragEnd={handleDragEnd}
         onTransformEnd={handleTransformEnd}
       >
+        {/* Inside the transformed group, outside the content clip, so dragging and rotating stay aligned. */}
+        {data.shadow.enabled && (
+          <Shape
+            width={totalW}
+            height={totalH}
+            sceneFunc={(context) => drawShadowOnly(context._context, totalW, totalH,
+              hasChrome ? WINDOW_CHROME_FRAMES[frameVariant as "macos" | "windows"].borderRadius
+                : hasDevice ? DEVICE_MOCKUP_FRAMES[frameVariant as "iphone" | "ipad" | "macbook"].bezelRadius
+                  : effectiveCornerRadius + bw, data.shadow)}
+            listening={false}
+          />
+        )}
+
         {/* Window Chrome Frame (macOS / Windows) */}
         {hasChrome && (
           <>

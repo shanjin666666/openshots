@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { batchLayout, BATCH_POSITIONS, DEFAULT_BATCH_SETTINGS } from "./layout";
+import { batchLayout, BATCH_POSITIONS, DEFAULT_BATCH_SETTINGS, type BatchSettings } from "./layout";
+import { imageFrameSize } from "../image-geometry";
+import { DEVICE_MOCKUP_FRAMES } from "../../components/composition/frames";
 
 const settings = () => structuredClone(DEFAULT_BATCH_SETTINGS);
 describe("batch placement", () => {
@@ -32,5 +34,87 @@ describe("batch placement", () => {
     expect(() => batchLayout(10000, 10000, config)).toThrow("limit");
     expect(() => batchLayout(100, 100, { ...config, sizeMode: "fixed", width: 64 })).toThrow("padding");
     expect(() => batchLayout(100, 100, { ...config, imageScale: NaN })).toThrow("Invalid");
+  });
+});
+
+const frames: NonNullable<BatchSettings["frame"]>[] = [
+  { type: "window-chrome", variant: "macos", theme: "light" },
+  { type: "window-chrome", variant: "windows", theme: "dark" },
+  { type: "device-mockup", variant: "iphone" },
+  { type: "device-mockup", variant: "ipad" },
+  { type: "device-mockup", variant: "macbook" },
+];
+
+describe("batch frames", () => {
+  it.each(frames)("preserves source pixels with $variant and grows the original-size canvas", (frame) => {
+    const config = { ...settings(), frame, border: { enabled: true, width: 8, color: "#ff0000" } };
+    for (const position of BATCH_POSITIONS) {
+      const layout = batchLayout(641, 479, { ...config, position });
+      const editorFrame = imageFrameSize({ frame, insetBorder: config.border }, 641, 479);
+      expect(layout.imageWidth).toBe(641);
+      expect(layout.imageHeight).toBe(479);
+      expect(layout.outerWidth).toBeGreaterThanOrEqual(editorFrame.width);
+      expect(layout.outerHeight).toBeGreaterThanOrEqual(editorFrame.height);
+      expect(layout.width).toBe(Math.ceil(layout.outerWidth + 128));
+      expect(layout.height).toBe(Math.ceil(layout.outerHeight + 128));
+      expect(Number.isInteger(layout.x + layout.contentX)).toBe(true);
+      expect(Number.isInteger(layout.y + layout.contentY)).toBe(true);
+      expect(layout.x + layout.outerWidth).toBeLessThanOrEqual(layout.width - 64);
+      expect(layout.y + layout.outerHeight).toBeLessThanOrEqual(layout.height - 64);
+    }
+  });
+
+  it.each(frames)("keeps the entire $variant frame inside fixed canvases at all nine positions", (frame) => {
+    for (const [sourceWidth, sourceHeight] of [[4000, 1000], [600, 2400], [501, 501]]) {
+      for (const position of BATCH_POSITIONS) {
+        for (const imageScale of [100, 70, 10]) {
+          const config = { ...settings(), frame, sizeMode: "fixed" as const, width: 809, height: 607, padding: 11,
+            border: { enabled: true, width: 13, color: "#ffffff" }, position, imageScale };
+          const layout = batchLayout(sourceWidth!, sourceHeight!, config);
+          expect(layout.imageWidth / layout.imageHeight).toBeCloseTo(sourceWidth! / sourceHeight!);
+          expect(layout.x).toBeGreaterThanOrEqual(11);
+          expect(layout.y).toBeGreaterThanOrEqual(11);
+          expect(layout.x + layout.outerWidth).toBeLessThanOrEqual(798 + 1e-9);
+          expect(layout.y + layout.outerHeight).toBeLessThanOrEqual(596 + 1e-9);
+          expect(layout.contentX + layout.imageWidth).toBeLessThanOrEqual(layout.outerWidth);
+          expect(layout.contentY + layout.imageHeight).toBeLessThanOrEqual(layout.outerHeight);
+          if (position.includes("left")) expect(layout.x).toBe(11);
+          if (position.includes("right")) expect(layout.x + layout.outerWidth).toBeCloseTo(798);
+          if (position.includes("top")) expect(layout.y).toBe(11);
+          if (position.includes("bottom")) expect(layout.y + layout.outerHeight).toBeCloseTo(596);
+        }
+      }
+    }
+  });
+
+  it("matches device offsets and ignores inset borders and image corner rounding inside device screens", () => {
+    for (const frame of frames.filter((candidate) => candidate.type === "device-mockup")) {
+      const config = { ...settings(), frame, cornerRadius: 99, border: { enabled: true, width: 40, color: "#ff0000" } };
+      const layout = batchLayout(641, 479, config);
+      const withoutBorder = batchLayout(641, 479, { ...config, border: { ...config.border, enabled: false } });
+      const device = DEVICE_MOCKUP_FRAMES[frame.variant as keyof typeof DEVICE_MOCKUP_FRAMES];
+      expect(layout).toEqual(withoutBorder);
+      expect(layout.radius).toBe(0);
+      expect(layout.outerRadius).toBe(device.bezelRadius);
+      expect(layout.contentX).toBe(Math.round(641 / (1 - device.screenInset.left - device.screenInset.right) * device.screenInset.left));
+      expect(layout.contentY).toBe(Math.round(479 / (1 - device.screenInset.top - device.screenInset.bottom) * device.screenInset.top));
+    }
+  });
+
+  it("reserves fixed title-bar height while resizing the screenshot content", () => {
+    const layout = batchLayout(400, 200, { ...settings(), frame: frames[0], sizeMode: "fixed", width: 400, height: 200, padding: 0 });
+    expect(layout.chromeHeight).toBe(28);
+    expect(layout.imageWidth).toBe(344);
+    expect(layout.imageHeight).toBe(172);
+    expect(layout.contentY).toBe(28);
+    expect(layout.outerHeight).toBe(200);
+  });
+
+  it("checks output limits after adding frames and rejects a canvas smaller than its title bar", () => {
+    expect(() => batchLayout(8192, 100, { ...settings(), padding: 0 })).not.toThrow();
+    expect(() => batchLayout(8192, 100, { ...settings(), padding: 0, frame: frames[2] })).toThrow("limit");
+    expect(() => batchLayout(8000, 4000, { ...settings(), padding: 0, frame: frames[0] })).toThrow("limit");
+    expect(() => batchLayout(200, 100, { ...settings(), sizeMode: "fixed", width: 200, height: 32, padding: 0, frame: frames[1] })).toThrow("padding");
+    expect(() => batchLayout(200, 100, { ...settings(), sizeMode: "fixed", width: 200, height: 48, padding: 0, frame: frames[1], border: { enabled: true, width: 8, color: "#fff" } })).toThrow("padding");
   });
 });

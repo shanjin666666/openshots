@@ -23,6 +23,8 @@ export const batchMessages: Record<string, string> = {
   "Each image is exported separately. Source files stay unchanged.": "每张图片分别导出，保留原始文件。",
   "Style template": "样式模板",
   "Apply a preset…": "应用预设…",
+  "Custom style": "自定义样式",
+  "Editor style": "编辑器当前样式",
   "Built-in presets": "内置预设",
   "Saved presets": "已保存的预设",
   "Use editor style": "沿用编辑器当前样式",

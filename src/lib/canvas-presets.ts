@@ -42,12 +42,17 @@ export function presetImageStyle(preset: Omit<CanvasPreset, "id">, image?: Pick<
   };
 }
 
+export function presetCanvasGeometry(preset: Pick<CanvasPreset, "canvasWidth" | "canvasHeight" | "padding">) {
+  const canvasWidth = Math.max(100, Math.round(preset.canvasWidth));
+  const canvasHeight = Math.max(100, Math.round(preset.canvasHeight));
+  const padding = Math.max(0, Math.min(preset.padding, Math.floor(Math.min(canvasWidth, canvasHeight) / 4)));
+  return { canvasWidth, canvasHeight, padding };
+}
+
 /** Apply size and appearance together so one undo restores the entire canvas. */
 export function applyCanvasPreset(preset: Omit<CanvasPreset, "id">): void {
   useCanvasStore.setState((state) => {
-    const canvasWidth = Math.max(100, Math.round(preset.canvasWidth));
-    const canvasHeight = Math.max(100, Math.round(preset.canvasHeight));
-    const padding = Math.max(0, Math.min(preset.padding, Math.floor(Math.min(canvasWidth, canvasHeight) / 4)));
+    const { canvasWidth, canvasHeight, padding } = presetCanvasGeometry(preset);
     const styledImages = state.images.map((image) => ({ ...image, ...presetImageStyle(preset, image) }));
     const sizeChanged = state.canvasWidth !== canvasWidth || state.canvasHeight !== canvasHeight || state.padding !== padding;
     const frameChanged = styledImages.some((image, index) => {

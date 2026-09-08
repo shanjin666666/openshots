@@ -1,7 +1,9 @@
 import Konva from "konva";
 import { backgroundGradient } from "../background-gradient";
 import { backgroundImageCrop } from "../background-image";
+import { drawShadowOnly } from "../shadow-render";
 import { batchLayout, type BatchSettings } from "./layout";
+import { createBatchFrame } from "./frames";
 
 export function loadBatchImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -22,7 +24,7 @@ export function renderBatchImage(source: HTMLImageElement, settings: BatchSettin
     stage.add(layer);
     layer.getCanvas().setPixelRatio(1);
     layer.getHitCanvas().setPixelRatio(1);
-    const { width, height, imageWidth, imageHeight, border, x, y, radius } = layout;
+    const { width, height, imageWidth, imageHeight, border, x, y, radius, outerWidth, outerHeight, outerRadius, contentX, contentY } = layout;
     const bg = settings.background;
     if (settings.format === "jpeg") layer.add(new Konva.Rect({ width, height, fill: "#ffffff" }));
     if (bg.type === "image" && !backgroundImage) throw new Error("Choose a background image first");
@@ -36,31 +38,25 @@ export function renderBatchImage(source: HTMLImageElement, settings: BatchSettin
       background.filters([Konva.Filters.Blur]);
       background.blurRadius(bg.blur * ratio);
     }
-    const outer = { x, y, width: imageWidth + border * 2, height: imageHeight + border * 2, cornerRadius: radius + border };
+    const outer = { x, y, width: outerWidth, height: outerHeight, cornerRadius: outerRadius };
     // Cast only the shadow so transparent source pixels remain transparent.
     if (settings.shadow.enabled) {
-      const shadowCanvas = document.createElement("canvas");
-      shadowCanvas.width = stage.width(); shadowCanvas.height = stage.height();
-      const ctx = shadowCanvas.getContext("2d")!;
-      ctx.scale(ratio, ratio);
-      ctx.shadowColor = settings.shadow.color;
-      ctx.shadowBlur = settings.shadow.blur * ratio;
-      ctx.shadowOffsetX = settings.shadow.offsetX * ratio;
-      ctx.shadowOffsetY = settings.shadow.offsetY * ratio;
-      ctx.fillStyle = "#000";
-      ctx.beginPath(); ctx.roundRect(x, y, outer.width, outer.height, radius + border); ctx.fill();
-      ctx.shadowColor = "transparent";
-      ctx.globalCompositeOperation = "destination-out";
-      ctx.fill();
-      layer.add(new Konva.Image({ image: shadowCanvas, width, height }));
+      layer.add(new Konva.Shape({ x, y, width: outerWidth, height: outerHeight,
+        sceneFunc: (ctx) => drawShadowOnly(ctx._context, outerWidth, outerHeight, outerRadius, settings.shadow),
+      }));
     }
     if (border > 0) layer.add(new Konva.Rect({ ...outer, fill: settings.border.color }));
-    const group = new Konva.Group({ x: x + border, y: y + border, clipFunc: (ctx) => {
+    const frame = createBatchFrame(settings.frame, imageWidth, imageHeight);
+    if (frame) {
+      frame.position({ x, y });
+      layer.add(frame);
+    }
+    const group = new Konva.Group({ x: x + contentX, y: y + contentY, clipFunc: radius > 0 ? (ctx) => {
       ctx.beginPath();
       ctx.moveTo(radius, 0); ctx.arcTo(imageWidth, 0, imageWidth, imageHeight, radius);
       ctx.arcTo(imageWidth, imageHeight, 0, imageHeight, radius); ctx.arcTo(0, imageHeight, 0, 0, radius);
       ctx.arcTo(0, 0, imageWidth, 0, radius); ctx.closePath();
-    } });
+    } : undefined });
     group.add(new Konva.Image({ image: source, width: imageWidth, height: imageHeight }));
     layer.add(group);
     layer.draw();

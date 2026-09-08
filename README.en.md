@@ -110,7 +110,7 @@ npx tauri build
 
 Open **Batch beautify** (批量美化), add multiple PNG/JPEG/WebP/BMP images, then choose a style and an output folder. Each source becomes a separate PNG or high-quality JPEG. Preview any item before exporting; the preview uses the same rendering path as the full-size output.
 
-- Apply a built-in/saved preset or copy the editor's background, padding, corners, shadow and border.
+- Share built-in and saved presets with the single-image editor. Applying a preset uses its canvas size, background, padding, corners, shadow, border and frame, or copy the editor's current style directly.
 - Keep each original image's pixel dimensions plus padding, or fit every image to a fixed canvas. Choose one of nine positions and adjust image size without stretching or cropping.
 - Files are named `original-styled.png` (or `.jpg`), with numeric suffixes on collisions. Originals and existing files are never overwritten.
 - Processing is sequential to limit memory use. Stop between images, inspect individual failures, and retry failed items. Successfully written images are retained when stopping.

@@ -14,6 +14,7 @@ export default function BackgroundLayer() {
   const rectRef = useRef<Konva.Rect>(null);
   const imgRef = useRef<Konva.Image>(null);
   const [bgImage, setBgImage] = useState<HTMLImageElement | null>(null);
+  const cachePixelRatio = Konva.pixelRatio || window.devicePixelRatio || 1;
 
   // Load background image if type is "image"
   useEffect(() => {
@@ -36,12 +37,12 @@ export default function BackgroundLayer() {
     node.clearCache();
     if (background.blur > 0) {
       node.filters([Konva.Filters.Blur]);
-      node.blurRadius(background.blur);
-      node.cache();
+      node.blurRadius(background.blur * cachePixelRatio);
+      node.cache({ pixelRatio: cachePixelRatio });
     } else {
       node.filters([]);
     }
-  }, [background, canvasWidth, canvasHeight]);
+  }, [background, canvasWidth, canvasHeight, cachePixelRatio]);
 
   // Apply blur filter to background image
   useEffect(() => {
@@ -50,12 +51,12 @@ export default function BackgroundLayer() {
     node.clearCache();
     if (background.blur > 0) {
       node.filters([Konva.Filters.Blur]);
-      node.blurRadius(background.blur);
-      node.cache();
+      node.blurRadius(background.blur * cachePixelRatio);
+      node.cache({ pixelRatio: cachePixelRatio });
     } else {
       node.filters([]);
     }
-  }, [background.blur, bgImage, canvasWidth, canvasHeight]);
+  }, [background.blur, bgImage, canvasWidth, canvasHeight, cachePixelRatio]);
 
 
   return (

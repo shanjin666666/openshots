@@ -2,15 +2,14 @@ import { useEffect, useState } from "react";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readImageFile } from "../../ipc/capture";
 import { BATCH_POSITIONS, POSITION_LABELS, type BatchSettings } from "../../lib/batch/layout";
-import { DEFAULT_PRESETS } from "../../lib/default-presets";
 import { BUILTIN_IMAGE_PRESETS } from "../../lib/builtin-image-presets";
-import { usePresetStore, type CanvasPreset } from "../../stores/preset.store";
-import { useCanvasStore } from "../../stores/canvas.store";
-import { presetImageStyle } from "../../lib/canvas-presets";
+import { usePresetStore } from "../../stores/preset.store";
+import { useBatchStore } from "../../stores/batch.store";
+import { EDITOR_STYLE_KEY } from "../../lib/batch/presets";
+import { type FrameType, getFrameConfig } from "../composition/frames";
 import { t, useLocale } from "../../lib/i18n";
 
 const inputClass = "w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200";
-const BATCH_PRESETS = [...BUILTIN_IMAGE_PRESETS, ...DEFAULT_PRESETS];
 function NumberField({ label, value, min = 0, max, onChange }: { label: string; value: number; min?: number; max: number; onChange: (n: number) => void }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => setDraft(String(value)), [value]);
@@ -35,18 +34,13 @@ function NumberField({ label, value, min = 0, max, onChange }: { label: string; 
 export default function BatchControls({ settings: s, onChange, onError }: { settings: BatchSettings; onChange: (patch: Partial<BatchSettings>) => void; onError: (message: string) => void }) {
   useLocale();
   const saved = usePresetStore((state) => state.presets);
+  const activePresetKey = useBatchStore((state) => state.activePresetKey);
+  const applyPreset = useBatchStore((state) => state.applyPreset);
+  const useEditorStyle = useBatchStore((state) => state.useEditorStyle);
+  const selectedPresetKey = activePresetKey === EDITOR_STYLE_KEY
+    || BUILTIN_IMAGE_PRESETS.some((preset) => activePresetKey === `builtin:${preset.name}`)
+    || saved.some((preset) => activePresetKey === `saved:${preset.id}`) ? activePresetKey ?? "" : "";
   const changeBackground = (patch: Partial<BatchSettings["background"]>) => onChange({ background: { ...s.background, ...patch } });
-  const applyPreset = (preset: Omit<CanvasPreset, "id">) => {
-    const style = presetImageStyle(preset, { insetBorder: s.border });
-    onChange({ width: preset.canvasWidth, height: preset.canvasHeight, padding: preset.padding,
-      background: structuredClone(preset.background), cornerRadius: style.cornerRadius, shadow: style.shadow, border: style.insetBorder });
-  };
-  const useEditorStyle = () => {
-    const editor = useCanvasStore.getState();
-    const image = editor.images.find((item) => item.id === editor.selectedId) || editor.images[0];
-    onChange({ width: editor.canvasWidth, height: editor.canvasHeight, padding: editor.padding, background: structuredClone(editor.background),
-      ...(image ? { cornerRadius: image.cornerRadius, shadow: { ...image.shadow }, border: { ...image.insetBorder } } : {}) });
-  };
   const chooseBackground = async () => {
     try {
       const path = await open({ multiple: false, filters: [{ name: t("Images"), extensions: ["png", "jpg", "jpeg", "webp", "bmp"] }] });
@@ -56,14 +50,17 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
   return <div className="space-y-6 p-4">
     <section className="space-y-3">
       <h2 className="text-sm font-medium">{t("Style template")}</h2>
-      <select aria-label={t("Style template")} value="" className={inputClass} onChange={(event) => {
-        const [kind, index] = event.target.value.split(":");
-        const preset = kind === "builtin" ? BATCH_PRESETS[Number(index)] : saved[Number(index)];
-        if (preset) applyPreset(preset);
+      <select aria-label={t("Style template")} value={selectedPresetKey} className={inputClass} onChange={(event) => {
+        const key = event.target.value;
+        const preset = key.startsWith("builtin:")
+          ? BUILTIN_IMAGE_PRESETS.find((item) => key === `builtin:${item.name}`)
+          : saved.find((item) => key === `saved:${item.id}`);
+        if (preset) applyPreset(preset, key);
       }}>
-        <option value="" disabled>{t("Apply a preset…")}</option>
-        <optgroup label={t("Built-in presets")}>{BATCH_PRESETS.map((preset, index) => <option key={preset.name} value={`builtin:${index}`}>{preset.name === "none" ? t("None") : t(preset.name)}</option>)}</optgroup>
-        {saved.length > 0 && <optgroup label={t("Saved presets")}>{saved.map((preset, index) => <option key={preset.id} value={`saved:${index}`}>{preset.name}</option>)}</optgroup>}
+        <option value="" disabled>{t("Custom style")}</option>
+        {selectedPresetKey === EDITOR_STYLE_KEY && <option value={EDITOR_STYLE_KEY} disabled>{t("Editor style")}</option>}
+        <optgroup label={t("Built-in presets")}>{BUILTIN_IMAGE_PRESETS.map((preset) => <option key={preset.name} value={`builtin:${preset.name}`}>{t(preset.name)}</option>)}</optgroup>
+        {saved.length > 0 && <optgroup label={t("Saved presets")}>{saved.map((preset) => <option key={preset.id} value={`saved:${preset.id}`}>{preset.name}</option>)}</optgroup>}
       </select>
       <button type="button" onClick={useEditorStyle} className="text-xs text-blue-400 hover:text-blue-300">{t("Use editor style")}</button>
     </section>
@@ -98,6 +95,15 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
     </section>
     <section className="space-y-3 border-t border-zinc-800 pt-4">
       <h2 className="text-sm font-medium">{t("Image style")}</h2>
+      <label className="flex items-center justify-between gap-3 text-xs text-zinc-400"><span>{t("Frame")}</span>
+        <select aria-label={t("Frame")} className={`${inputClass} max-w-32`} value={s.frame?.variant ?? "none"} onChange={(event) => {
+          const variant = event.target.value as FrameType;
+          onChange({ frame: getFrameConfig(variant) ? { type: variant === "macos" || variant === "windows" ? "window-chrome" : "device-mockup", variant, theme: s.frame?.theme ?? "dark" } : undefined });
+        }}>
+          <option value="none">{t("None")}</option><option value="macos">macOS</option><option value="windows">Windows</option>
+          <option value="iphone">iPhone</option><option value="ipad">iPad</option><option value="macbook">MacBook</option>
+        </select>
+      </label>
       <NumberField label={t("Corners")} value={s.cornerRadius} max={200} onChange={(cornerRadius) => onChange({ cornerRadius })} />
       <label className="flex justify-between text-xs text-zinc-400">{t("Drop Shadow")}<input type="checkbox" checked={s.shadow.enabled} onChange={(event) => onChange({ shadow: { ...s.shadow, enabled: event.target.checked } })} /></label>
       {s.shadow.enabled && <><NumberField label={t("Shadow blur")} value={s.shadow.blur} max={100} onChange={(blur) => onChange({ shadow: { ...s.shadow, blur } })} />

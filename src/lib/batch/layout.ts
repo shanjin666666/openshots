@@ -1,4 +1,6 @@
 import type { CanvasBackground, CanvasImage } from "../../stores/canvas.store";
+import { DEVICE_MOCKUP_FRAMES, WINDOW_CHROME_FRAMES } from "../../components/composition/frames";
+import { imageFrameSize } from "../image-geometry";
 
 export type BatchPosition = "top-left" | "top" | "top-right" | "left" | "center" | "right" | "bottom-left" | "bottom" | "bottom-right";
 export const BATCH_POSITIONS: BatchPosition[] = ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"];
@@ -17,6 +19,7 @@ export interface BatchSettings {
   cornerRadius: number;
   shadow: CanvasImage["shadow"];
   border: CanvasImage["insetBorder"];
+  frame?: CanvasImage["frame"];
   format: "png" | "jpeg";
 }
 
@@ -29,6 +32,30 @@ export const DEFAULT_BATCH_SETTINGS: BatchSettings = {
   format: "png",
 };
 
+function frameBounds(imageWidth: number, imageHeight: number, settings: BatchSettings) {
+  const frame = imageFrameSize({ frame: settings.frame, insetBorder: settings.border }, imageWidth, imageHeight);
+  const variant = settings.frame?.variant;
+  const device = settings.frame?.type === "device-mockup" && (variant === "iphone" || variant === "ipad" || variant === "macbook")
+    ? DEVICE_MOCKUP_FRAMES[variant] : undefined;
+  const chrome = settings.frame?.type === "window-chrome" && (variant === "macos" || variant === "windows")
+    ? WINDOW_CHROME_FRAMES[variant] : undefined;
+  // DeviceMockup draws a fractional body around rounded screen offsets. Include
+  // both bounds so even a device aligned against the canvas edge stays inside.
+  const bodyWidth = device ? imageWidth / (1 - device.screenInset.left - device.screenInset.right) : frame.width;
+  const bodyHeight = device ? imageHeight / (1 - device.screenInset.top - device.screenInset.bottom) : frame.height;
+  const outerWidth = Math.max(frame.width, bodyWidth);
+  const outerHeight = Math.max(frame.height, bodyHeight);
+  const border = !device && !chrome && settings.border.enabled ? settings.border.width : 0;
+  const radius = device ? 0 : Math.min(settings.cornerRadius, imageWidth / 2, imageHeight / 2);
+  return {
+    outerWidth, outerHeight, border, radius,
+    chromeHeight: frame.chromeHeight, deviceInsets: frame.deviceInsets,
+    contentX: frame.deviceInsets?.left ?? (chrome ? 0 : border),
+    contentY: frame.deviceInsets?.top ?? (chrome ? frame.chromeHeight : border),
+    outerRadius: Math.min(device?.bezelRadius ?? chrome?.borderRadius ?? radius + border, outerWidth / 2, outerHeight / 2),
+  };
+}
+
 export function batchLayout(sourceWidth: number, sourceHeight: number, settings: BatchSettings) {
   const { padding, imageScale, position } = settings;
   if (![sourceWidth, sourceHeight, settings.width, settings.height, padding, imageScale, settings.cornerRadius, settings.border.width].every(Number.isFinite)
@@ -36,22 +63,47 @@ export function batchLayout(sourceWidth: number, sourceHeight: number, settings:
       || settings.cornerRadius < 0 || settings.border.width < 0 || !BATCH_POSITIONS.includes(position)) {
     throw new Error("Invalid batch dimensions");
   }
-  const border = settings.border.enabled ? settings.border.width : 0;
-  const width = Math.round(settings.sizeMode === "original" ? sourceWidth + 2 * (padding + border) : settings.width);
-  const height = Math.round(settings.sizeMode === "original" ? sourceHeight + 2 * (padding + border) : settings.height);
-  if (width <= 2 * (padding + border) || height <= 2 * (padding + border)) throw new Error("Canvas is too small for this padding");
+  const original = frameBounds(sourceWidth, sourceHeight, settings);
+  const width = settings.sizeMode === "original" ? Math.ceil(original.outerWidth + padding * 2) : Math.round(settings.width);
+  const height = settings.sizeMode === "original" ? Math.ceil(original.outerHeight + padding * 2) : Math.round(settings.height);
+  const emptyFrame = frameBounds(0, 0, settings);
+  const innerWidth = width - padding * 2;
+  const innerHeight = height - padding * 2;
+  if (innerWidth <= emptyFrame.outerWidth || innerHeight <= emptyFrame.outerHeight) throw new Error("Canvas is too small for this padding");
   if (width > 8192 || height > 8192 || width * height > 32_000_000) throw new Error("Output exceeds the 32 megapixel or 8192 px limit");
-  const fit = Math.min((width - 2 * (padding + border)) / sourceWidth, (height - 2 * (padding + border)) / sourceHeight) * imageScale / 100;
+  let fit = 1;
+  if (settings.sizeMode === "fixed") {
+    if (!original.deviceInsets) {
+      fit = Math.min((innerWidth - emptyFrame.outerWidth) / sourceWidth, (innerHeight - emptyFrame.outerHeight) / sourceHeight);
+    } else {
+      // Insets are rounded in the editor. Solve against those same bounds rather
+      // than fitting the content first and letting its frame overflow afterwards.
+      let low = 0;
+      let high = Math.min(innerWidth / sourceWidth, innerHeight / sourceHeight);
+      for (let i = 0; i < 52; i++) {
+        const candidate = (low + high) / 2;
+        const bounds = frameBounds(sourceWidth * candidate, sourceHeight * candidate, settings);
+        if (bounds.outerWidth <= innerWidth && bounds.outerHeight <= innerHeight) low = candidate;
+        else high = candidate;
+      }
+      fit = low;
+    }
+  }
+  fit *= imageScale / 100;
   const imageWidth = sourceWidth * fit;
   const imageHeight = sourceHeight * fit;
-  const outerWidth = imageWidth + border * 2;
-  const outerHeight = imageHeight + border * 2;
+  const frame = frameBounds(imageWidth, imageHeight, settings);
   const alignX = position.includes("left") ? 0 : position.includes("right") ? 1 : 0.5;
   const alignY = position.includes("top") ? 0 : position.includes("bottom") ? 1 : 0.5;
+  // At original size, fractional device bodies must not shift the screenshot
+  // onto half-pixels and soften its otherwise unchanged source pixels.
+  const placementWidth = settings.sizeMode === "original" ? Math.ceil(frame.outerWidth) : frame.outerWidth;
+  const placementHeight = settings.sizeMode === "original" ? Math.ceil(frame.outerHeight) : frame.outerHeight;
   return {
-    width, height, imageWidth, imageHeight, border,
-    x: padding + (width - 2 * padding - outerWidth) * alignX,
-    y: padding + (height - 2 * padding - outerHeight) * alignY,
-    radius: Math.min(settings.cornerRadius, imageWidth / 2, imageHeight / 2),
+    width, height, imageWidth, imageHeight, ...frame,
+    x: padding + Math.max(0, innerWidth - placementWidth) * alignX,
+    y: padding + Math.max(0, innerHeight - placementHeight) * alignY,
   };
 }
+
+export type BatchLayout = ReturnType<typeof batchLayout>;
