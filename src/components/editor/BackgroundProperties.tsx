@@ -1,7 +1,9 @@
 import { t, useLocale } from "../../lib/i18n";
 import { useEffect, useRef, useState } from "react";
 import { useCanvasStore } from "../../stores/canvas.store";
-import { usePresetStore, type CanvasPreset } from "../../stores/preset.store";
+import type { CanvasPreset } from "../../stores/preset.store";
+import { applyCanvasPreset } from "../../lib/canvas-presets";
+import SavedPresetManager from "../presets/SavedPresetManager";
 import { ASPECT_RATIOS, canvasSize } from "../../lib/aspectRatios";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl, type SystemWallpaper } from "../../ipc/capture";
@@ -63,10 +65,6 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
   const setCanvasSize = useCanvasStore((s) => s.setCanvasSize);
   const padding = useCanvasStore((s) => s.padding);
   const setPadding = useCanvasStore((s) => s.setPadding);
-
-  const presets = usePresetStore((s) => s.presets);
-  const addPreset = usePresetStore((s) => s.addPreset);
-  const removePreset = usePresetStore((s) => s.removePreset);
 
   const [wallpapers, setWallpapers] = useState<(SystemWallpaper & { thumb?: string })[]>([]);
   const [loadingWp, setLoadingWp] = useState<string | null>(null);
@@ -179,51 +177,9 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
   const isGradient = background.type === "linear-gradient" || background.type === "radial-gradient";
   const currentRatio = canvasWidth / canvasHeight;
 
-  // Preset save handler
-  const handleSavePreset = () => {
-    const state = useCanvasStore.getState();
-    const name = t("Preset {count}", { count: presets.length + 1 });
-    const firstImage = state.images[0];
-    const preset: CanvasPreset = {
-      id: crypto.randomUUID(),
-      name,
-      canvasWidth: state.canvasWidth,
-      canvasHeight: state.canvasHeight,
-      padding: state.padding,
-      background: { ...state.background },
-      cornerRadius: firstImage?.cornerRadius ?? 12,
-      shadowEnabled: firstImage?.shadow.enabled ?? true,
-      shadowBlur: firstImage?.shadow.blur ?? 20,
-      shadowOffsetY: firstImage?.shadow.offsetY ?? 10,
-      insetBorderEnabled: firstImage?.insetBorder.enabled ?? false,
-      insetBorderWidth: firstImage?.insetBorder.width ?? 8,
-    };
-    addPreset(preset);
-  };
-
   const handleApplyPreset = (preset: Omit<CanvasPreset, "id">) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
-    const store = useCanvasStore.getState();
-    store.setCanvasSize(preset.canvasWidth, preset.canvasHeight);
-    store.setPadding(preset.padding);
-    store.setBackground(preset.background);
-    store.images.forEach((img) => {
-      store.updateImage(img.id, {
-        cornerRadius: preset.cornerRadius,
-        shadow: {
-          enabled: preset.shadowEnabled,
-          color: "rgba(0,0,0,0.3)",
-          blur: preset.shadowBlur,
-          offsetX: 0,
-          offsetY: preset.shadowOffsetY,
-        },
-        insetBorder: {
-          enabled: preset.insetBorderEnabled,
-          color: img.insetBorder.color,
-          width: preset.insetBorderWidth,
-        },
-      });
-    });
+    applyCanvasPreset(preset);
   };
 
   return (
@@ -299,49 +255,7 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
           <img src={preset.background.imageSrc!} alt="" className="w-10 h-7 object-cover rounded" />{t(preset.name)}
         </button>)}
         <p className="text-[11px] text-zinc-500">{t("Saved presets")}</p>
-        <button
-          onClick={handleSavePreset}
-          className="w-full px-3 py-2 text-[13px] rounded-md bg-zinc-800/60 text-zinc-300 hover:bg-zinc-700/60 transition-colors duration-150"
-        >
-          {t("Save Current as Preset")}
-        </button>
-
-        {presets.length === 0 && (
-          <p className="text-[11px] text-zinc-500">{t("No saved presets")}</p>
-        )}
-
-        <div className="space-y-1">
-          {presets.map((preset) => (
-            <div
-              key={preset.id}
-              className="flex items-center gap-2 px-2 py-2 rounded-md bg-zinc-800/40 group"
-            >
-              <div
-                className="w-5 h-4 rounded-sm shrink-0 border border-zinc-700/50"
-                style={{
-                  background:
-                    preset.background.type === "image" && preset.background.imageSrc
-                      ? `center / cover url(${preset.background.imageSrc})`
-                      : preset.background.type === "solid"
-                      ? preset.background.color
-                      : `linear-gradient(${preset.background.gradientAngle}deg, ${preset.background.gradientColors[0]}, ${preset.background.gradientColors[1]})`,
-                }}
-              />
-              <button
-                onClick={() => handleApplyPreset(preset)}
-                className="flex-1 text-left text-[13px] text-zinc-400 hover:text-zinc-100 truncate transition-colors duration-150"
-              >
-                {preset.name}
-              </button>
-              <button
-                onClick={() => removePreset(preset.id)}
-                className="text-zinc-600 hover:text-red-400 text-[13px] opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-              >
-                x
-              </button>
-            </div>
-          ))}
-        </div>
+        <SavedPresetManager onApply={handleApplyPreset} />
       </Section>
 
       {/* Background */}

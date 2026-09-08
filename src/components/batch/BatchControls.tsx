@@ -6,6 +6,7 @@ import { DEFAULT_PRESETS } from "../../lib/default-presets";
 import { BUILTIN_IMAGE_PRESETS } from "../../lib/builtin-image-presets";
 import { usePresetStore, type CanvasPreset } from "../../stores/preset.store";
 import { useCanvasStore } from "../../stores/canvas.store";
+import { presetImageStyle } from "../../lib/canvas-presets";
 import { t, useLocale } from "../../lib/i18n";
 
 const inputClass = "w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200";
@@ -35,12 +36,11 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
   useLocale();
   const saved = usePresetStore((state) => state.presets);
   const changeBackground = (patch: Partial<BatchSettings["background"]>) => onChange({ background: { ...s.background, ...patch } });
-  const applyPreset = (preset: Omit<CanvasPreset, "id">) => onChange({
-    width: preset.canvasWidth, height: preset.canvasHeight, padding: preset.padding, background: structuredClone(preset.background),
-    cornerRadius: preset.cornerRadius,
-    shadow: { ...s.shadow, enabled: preset.shadowEnabled, blur: preset.shadowBlur, offsetY: preset.shadowOffsetY },
-    border: { ...s.border, enabled: preset.insetBorderEnabled, width: preset.insetBorderWidth },
-  });
+  const applyPreset = (preset: Omit<CanvasPreset, "id">) => {
+    const style = presetImageStyle(preset, { insetBorder: s.border });
+    onChange({ width: preset.canvasWidth, height: preset.canvasHeight, padding: preset.padding,
+      background: structuredClone(preset.background), cornerRadius: style.cornerRadius, shadow: style.shadow, border: style.insetBorder });
+  };
   const useEditorStyle = () => {
     const editor = useCanvasStore.getState();
     const image = editor.images.find((item) => item.id === editor.selectedId) || editor.images[0];
