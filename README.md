@@ -1,275 +1,291 @@
 # OpenShots
 
-Turn raw screenshots into polished, shareable visuals in seconds. Free, open-source, and completely offline.
+**简体中文** | [English](README.en.md)
 
-OpenShots is a cross-platform desktop app built with Tauri (Rust + React). Capture screenshots, add beautiful backgrounds, annotate with shapes and text, blur sensitive areas, and export polished results without leaving the app or sending data anywhere.
+几秒钟内，把普通截图变成精美、便于分享的图片。免费、开源，完全离线运行。
 
-**Built by the [TraceKit](https://github.com/Tracekit-Dev) team** — the makers of TraceKit APM.
+OpenShots 是基于 Tauri（Rust + React）构建的跨平台桌面应用。你可以在同一个应用中完成截图、添加背景、图形与文字标注、敏感信息模糊处理和导出，无需将图片上传到任何服务。
 
-## Features
+**原项目由 [TraceKit](https://github.com/Tracekit-Dev) 团队开发**，该团队也是 TraceKit APM 的开发者。
 
-**Capture**
-- Full screen, region selection, or specific window capture
-- Global hotkeys (configurable)
-- System tray quick access
-- Self-timer, Retina downscale, and crosshair-assisted capture
-- macOS Screen Recording permission handling
+## 功能
 
-**Beautify**
-- Gradient, solid color, or custom image backgrounds
-- macOS system wallpapers built-in
-- Adjustable padding, rounded corners, drop shadows
-- Auto-matched inset borders
-- Multiple images with fan layout
-- Window chrome and device mockup frames
+**截图**
 
-**Annotate**
-- Arrows, rectangles, ellipses, text labels, emoji
-- Speech bubbles, spotlight overlays, and numbered callouts
-- Blur and pixelate regions for privacy
-- Drag, resize, rotate any element
-- Full undo/redo history
+- 支持全屏、区域和指定窗口截图
+- 支持自定义全局快捷键
+- 通过系统托盘快速操作
+- 支持延时截图、Retina 缩放和十字准星辅助截图
+- 引导设置 macOS 屏幕录制权限
 
-**Export**
-- PNG, JPEG, WebP with quality control
-- 1x, 2x, 3x scale export
-- One-click clipboard copy
-- OS share sheet integration
-- Save/apply reusable presets
-- Import/export presets as JSON
-- Auto-save projects and reopen recent work
+**美化**
 
-**Automation**
-- Full CLI for batch processing, annotation, privacy, and export
-- All commands support an optional `--preset` flag for beautification
-- Manage presets: create, copy, edit, inspect
-- See [CLI Reference](#cli-reference) below
+- 支持渐变、纯色和自定义图片背景
+- 可选用 macOS 系统壁纸
+- 可调整留白、圆角和阴影
+- 自动匹配内边框
+- 支持多图编辑与扇形排版
+- 支持窗口外框和设备样机外框
 
-## Install
+**标注**
 
-Download the latest release for your platform:
+- 箭头、矩形、椭圆、文字和表情
+- 对话气泡、聚光灯遮罩和数字标记
+- 通过模糊或马赛克隐藏敏感区域
+- 支持拖动、缩放和旋转元素
+- 完整的撤销与重做历史
 
-| Platform | Download |
-|----------|----------|
-| macOS (Apple Silicon) | [.dmg](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_aarch64.dmg) |
-| macOS (Intel) | [.dmg](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_x64.dmg) |
+**导出**
+
+- 支持 PNG、JPEG、WebP 格式及画质调整
+- 支持 1 倍、2 倍和 3 倍尺寸导出
+- 一键复制到剪贴板
+- 集成系统分享菜单
+- 保存和应用可复用的样式预设
+- 以 JSON 格式导入、导出预设
+- 自动保存项目，并可重新打开最近编辑的内容
+
+**自动化**
+
+- 提供 CLI，支持批量处理、标注、隐私处理和导出
+- 通过可选的 `--preset` 参数应用美化预设
+- 支持创建、复制、编辑和查看预设
+- 详见下方的 [CLI 使用说明](#cli-使用说明)
+
+## 安装
+
+下方下载链接来自上游 [TraceKit 仓库的发行版](https://github.com/Tracekit-Dev/openshots/releases)，不包含本仓库新增的修改。如需使用本仓库的修改版，请[从源码构建](#从源码构建)。
+
+| 平台 | 下载 |
+|------|------|
+| macOS（Apple Silicon） | [.dmg](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_aarch64.dmg) |
+| macOS（Intel） | [.dmg](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_x64.dmg) |
 | Windows | [.msi](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_x64_en-US.msi) |
-| Linux (AppImage) | [.AppImage](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_amd64.AppImage) |
-| Linux (deb) | [.deb](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_amd64.deb) |
+| Linux（AppImage） | [.AppImage](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_amd64.AppImage) |
+| Linux（deb） | [.deb](https://github.com/Tracekit-Dev/openshots/releases/latest/download/OpenShots_2.0.4_amd64.deb) |
 
-The macOS builds are code-signed and notarized with an Apple Developer ID certificate.
+上游 macOS 发行版使用 Apple Developer ID 证书进行代码签名和公证。
 
-## Build from source
+## 从源码构建
 
-**Prerequisites:**
-- [Rust](https://rustup.rs/) 1.77.2+
-- [Node.js](https://nodejs.org/) 18+
+**环境要求：**
+
+- [Rust](https://rustup.rs/) 稳定版
+- [Node.js](https://nodejs.org/) 20.19 及以上的 20.x 版本，或 22.12 及以上版本
 - npm
 
 ```bash
-# Clone the repo
-git clone https://github.com/Tracekit-Dev/openshots.git
+# 克隆本仓库
+git clone https://github.com/shanjin666666/openshots.git
 cd openshots
 
-# Install dependencies
+# 安装依赖
 npm install
 
-# Run in development
+# 启动开发模式
 npx tauri dev
 
-# Build for production
+# 构建正式版本
 npx tauri build
 ```
 
-### Platform-specific notes
+### 各平台说明
 
-**macOS:** Requires Screen Recording permission for capture. The app will prompt on first use.
+**macOS：** 截图需要屏幕录制权限，首次使用时应用会提示授权。
 
-**Linux (Wayland):** Global hotkeys are unavailable on Wayland. Use the system tray to trigger captures.
+**Linux（Wayland）：** Wayland 下无法使用全局快捷键，请通过系统托盘触发截图。
 
-**Windows:** No special requirements.
+**Windows：** 无特殊要求。
 
-## Tech Stack
+## 技术栈
 
-- **Tauri 2.x** — Rust backend, tiny binaries (<20MB)
-- **React 19 + TypeScript** — UI components
-- **Konva.js** — Canvas rendering engine
-- **Zustand** — State management with undo/redo
-- **Tailwind CSS v4** — Styling
-- **xcap** — Cross-platform screen capture
+- **Tauri 2.x**：Rust 后端与桌面应用框架
+- **React 19 + TypeScript**：界面组件
+- **Konva.js**：画布渲染引擎
+- **Zustand**：状态管理，支持撤销与重做
+- **Tailwind CSS v4**：界面样式
+- **xcap**：跨平台截图
 
-## Batch beautification
+## 批量美化
 
-Open **Batch beautify** (批量美化), add multiple PNG/JPEG/WebP/BMP images, then choose a style and an output folder. Each source becomes a separate PNG or high-quality JPEG. Preview any item before exporting; the preview uses the same rendering path as the full-size output.
+打开**批量美化**，添加多张 PNG、JPEG、WebP 或 BMP 图片，再选择样式和输出文件夹。每张原图会分别生成一张 PNG 或高画质 JPEG。导出前可以预览任意图片，预览与完整尺寸导出使用相同的渲染流程。
 
-- Apply a built-in/saved preset or copy the editor's background, padding, corners, shadow and border.
-- Keep each original image's pixel dimensions plus padding, or fit every image to a fixed canvas. Choose one of nine positions and adjust image size without stretching or cropping.
-- Files are named `original-styled.png` (or `.jpg`), with numeric suffixes on collisions. Originals and existing files are never overwritten.
-- Processing is sequential to limit memory use. Stop between images, inspect individual failures, and retry failed items. Successfully written images are retained when stopping.
-- Each output is limited to 32 megapixels and 8192 pixels per side. Batch settings and file selections are retained while navigating within the current app session.
+- 应用内置或已保存的预设，也可以复制编辑器中的背景、留白、圆角、阴影和边框设置。
+- 可保留原图像素尺寸并增加留白，也可以让所有图片适配统一尺寸的画布。支持九种位置和图片大小调整，不拉伸、不裁剪原图。
+- 文件名为 `原文件名-styled.png`（或 `.jpg`），重名时自动添加数字后缀，不覆盖原图或已有文件。
+- 图片按顺序处理，以控制内存占用。可在图片处理间隙停止、查看单张图片的失败原因，并重试失败项；停止后会保留已经导出的图片。
+- 每张输出图片最多为 3200 万像素，单边不超过 8192 像素。在当前应用会话中切换页面时，会保留批量设置和已选择的图片。
 
-Validation: `npx vitest run src/lib/batch` and `cargo test --manifest-path src-tauri/Cargo.toml --lib commands::batch::tests`.
+验证命令：`npx vitest run src/lib/batch` 和 `cargo test --manifest-path src-tauri/Cargo.toml --lib commands::batch::tests`。
 
-## Interface language
+## 界面语言
 
-Open **Settings → Language** (设置 → 语言) to switch between **简体中文** and **English**. Changes apply immediately and are remembered after restarting. Simplified Chinese is the default. Changing language does not alter screenshot content, project names, presets, or keyboard shortcuts.
+打开**设置 → 语言**，即可在**简体中文**和 **English** 之间切换。切换立即生效，重启后保留选择，默认语言为简体中文。语言切换不会改变截图内容、项目名称、预设名称或快捷键。
 
-Frontend messages live in `src/lib/i18n/messages.ts`. Use `t()` for messages and `useLocale()` in components that display them. English source messages are the fallback keys. Translate static tool registries at render time, and store status codes rather than translated strings. Native application/tray menus are synchronized through `src-tauri/src/i18n.rs`.
+前端文案位于 `src/lib/i18n/messages.ts`。使用 `t()` 获取文案，在显示文案的组件中使用 `useLocale()`。英文原文同时作为回退键。静态工具列表应在渲染时翻译，状态应保存为状态码，而不是翻译后的字符串。原生应用菜单和托盘菜单通过 `src-tauri/src/i18n.rs` 同步语言。
 
-Run language-layer checks with `npx vitest run src/lib/i18n/i18n.test.ts` and the frontend build with `npm run build`. Native menu changes also require desktop verification with `npx tauri dev`.
+运行 `npx vitest run src/lib/i18n/i18n.test.ts` 检查语言层，运行 `npm run build` 检查前端构建。修改原生菜单后，还需要通过 `npx tauri dev` 在桌面应用中验证。
 
-## Keyboard Shortcuts
+## 快捷键
 
-| Action | macOS | Windows/Linux |
-|--------|-------|---------------|
-| Capture Full Screen | `Cmd+Shift+4` | `Ctrl+Shift+4` |
-| Capture Region | `Cmd+Shift+3` | `Ctrl+Shift+3` |
-| Capture Window | `Cmd+Shift+5` | `Ctrl+Shift+5` |
-| Undo | `Cmd+Z` | `Ctrl+Z` |
-| Redo | `Cmd+Shift+Z` | `Ctrl+Shift+Z` |
-| Delete selected | `Delete` / `Backspace` | `Delete` / `Backspace` |
-| Reset zoom | `Cmd+0` | `Ctrl+0` |
-| Tools | `V` `A` `R` `E` `T` `M` `B` `P` | Same |
+| 操作 | macOS | Windows / Linux |
+|------|-------|-----------------|
+| 全屏截图 | `Cmd+Shift+4` | `Ctrl+Shift+4` |
+| 区域截图 | `Cmd+Shift+3` | `Ctrl+Shift+3` |
+| 窗口截图 | `Cmd+Shift+5` | `Ctrl+Shift+5` |
+| 撤销 | `Cmd+Z` | `Ctrl+Z` |
+| 重做 | `Cmd+Shift+Z` | `Ctrl+Shift+Z` |
+| 删除所选元素 | `Delete` / `Backspace` | `Delete` / `Backspace` |
+| 重置缩放 | `Cmd+0` | `Ctrl+0` |
+| 切换工具 | `V` `A` `R` `E` `T` `M` `B` `P` | 相同 |
 
-## CLI Reference
+## CLI 使用说明
 
-OpenShots includes a CLI (`openshots-cli`) for batch processing and automation.
+OpenShots 提供命令行工具 `openshots-cli`，用于批量处理和自动化。
 
-### Install CLI
+### 安装 CLI
 
-**macOS (Apple Silicon):**
+下列命令下载的是上游 TraceKit 发行版中的 CLI，不包含本仓库的修改。如需构建本仓库的 CLI，请运行 `cargo build --release --bin openshots-cli --manifest-path src-tauri/Cargo.toml`，生成的程序位于 `src-tauri/target/release/`。
+
+**macOS（Apple Silicon）：**
+
 ```bash
 curl -L https://github.com/Tracekit-Dev/openshots/releases/latest/download/openshots-cli-darwin-arm64 -o /usr/local/bin/openshots-cli && chmod +x /usr/local/bin/openshots-cli
 ```
 
-**macOS (Intel):**
+**macOS（Intel）：**
+
 ```bash
 curl -L https://github.com/Tracekit-Dev/openshots/releases/latest/download/openshots-cli-darwin-x64 -o /usr/local/bin/openshots-cli && chmod +x /usr/local/bin/openshots-cli
 ```
 
-**Linux:**
+**Linux：**
+
 ```bash
 curl -L https://github.com/Tracekit-Dev/openshots/releases/latest/download/openshots-cli-linux-x64 -o /usr/local/bin/openshots-cli && chmod +x /usr/local/bin/openshots-cli
 ```
 
-**Windows (PowerShell):**
+**Windows（PowerShell）：**
+
 ```powershell
 Invoke-WebRequest -Uri https://github.com/Tracekit-Dev/openshots/releases/latest/download/openshots-cli-windows-x64.exe -OutFile "$env:LOCALAPPDATA\openshots-cli.exe"
 ```
 
-These URLs always point to the latest release. To pin a specific version, replace `latest` with the tag:
+这些链接指向上游最新发行版。如需固定版本，请改用带版本标签的下载地址，例如：
+
 ```
 https://github.com/Tracekit-Dev/openshots/releases/download/v2.0.4/openshots-cli-darwin-arm64
 ```
 
-Verify the installation:
+验证安装：
+
 ```bash
 openshots-cli --version
 ```
 
-### Presets
+### 预设
 
-Presets define the beautification style: background, padding, corner radius, shadow, and inset border. 7 built-in presets ship with OpenShots. User presets are stored in `~/.openshots/presets.json`.
+CLI 预设定义背景、留白、圆角、阴影和内边框等美化样式。OpenShots CLI 提供 7 套内置预设，用户预设保存在 `~/.openshots/presets.json`。
 
 ```bash
-# List all available presets
+# 列出所有可用预设
 openshots-cli list-presets
 
-# Show full config of a preset
+# 查看预设的完整配置
 openshots-cli show-preset ocean
 
-# Copy a built-in preset for customization
+# 复制内置预设进行自定义
 openshots-cli copy-preset ocean --new-name my-ocean
 
-# Create a new preset from scratch
+# 从头创建一个新预设
 openshots-cli create-preset my-brand
 
-# Open presets file in your $EDITOR
+# 使用 $EDITOR 指定的编辑器打开预设文件
 openshots-cli edit-presets
 ```
 
-### Beautify
+### 美化图片
 
-Apply a preset to one or more screenshots. Adds background, padding, corner radius, shadow, and inset border.
+为一张或多张截图应用预设，添加背景、留白、圆角、阴影和内边框。
 
 ```bash
-# Single image
+# 处理单张图片
 openshots-cli beautify --preset ocean --input screenshot.png --output ./out --format png
 
-# Batch process with glob
+# 使用通配符批量处理
 openshots-cli beautify --preset clean-dark --input "screenshots/*.png" --output ./out --format png
 
-# Export as WebP
+# 导出为 WebP
 openshots-cli beautify --preset vibrant-sunset --input shot.png --output ./out --format webp --quality 85
 ```
 
-### Annotate
+### 添加标注
 
-Add text annotations to images. Use `--preset` to also apply beautification.
+向图片添加文字标注。使用 `--preset` 可以同时应用美化样式。
 
 ```bash
-# Text on raw image
+# 在原图上添加文字
 openshots-cli annotate --input shot.png --output annotated.png \
   --text "Draft" --text-x 50 --text-y 50 --font-size 48 --color "#ff0000"
 
-# Text + preset beautification
+# 添加文字并应用预设
 openshots-cli annotate --input shot.png --output styled.png \
   --text "v2.0" --text-x 20 --text-y 20 --font-size 32 --color "#ffffff" \
   --preset ocean
 ```
 
-### Privacy
+### 隐私处理
 
-Pixelate regions to hide sensitive content. Coordinates are `x,y,width,height`. Use `;` to separate multiple regions.
+通过马赛克隐藏敏感区域。坐标格式为 `x,y,width,height`，多个区域之间用 `;` 分隔。
 
 ```bash
-# Pixelate a region
+# 对一个区域添加马赛克
 openshots-cli privacy --input shot.png --output redacted.png \
   --regions "100,100,300,200" --intensity 20
 
-# Multiple regions + preset
+# 处理多个区域并应用预设
 openshots-cli privacy --input shot.png --output styled.png \
   --regions "100,100,300,200;500,50,150,100" --intensity 25 \
   --preset clean-dark
 ```
 
-### Export
+### 导出
 
-Convert format, adjust quality, or scale. Use `--preset` to beautify during export.
+转换图片格式、调整画质或缩放尺寸。使用 `--preset` 可以在导出时应用美化样式。
 
 ```bash
-# Convert PNG to WebP
+# 将 PNG 转为 WebP
 openshots-cli export --input shot.png --output shot.webp --format webp --quality 80
 
-# Export at 2x scale
+# 以 2 倍尺寸导出
 openshots-cli export --input shot.png --output shot@2x.png --format png --scale 2
 
-# Convert + beautify
+# 转换格式并应用美化样式
 openshots-cli export --input shot.png --output styled.webp --format webp --quality 85 --preset ocean
 ```
 
-### Render
+### 渲染项目
 
-Render an `.openshots` project file to an image.
+将 `.openshots` 项目文件渲染为图片。
 
 ```bash
 openshots-cli render --input project.openshots --output final.png --format png --quality 90
 ```
 
-## Community
+## 社区
 
-Join the [TraceKit Discord](https://discord.gg/huSuJ94k) for questions, feedback, and discussion.
+欢迎加入 [TraceKit Discord](https://discord.gg/huSuJ94k)，提问、反馈或参与讨论。
 
-## Contributing
+## 参与贡献
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and guidelines.
+开发环境配置和贡献指南请参阅 [CONTRIBUTING.md](CONTRIBUTING.md)。
 
-## License
+## 许可证
 
 [MIT](LICENSE)
 
 ---
 
 <p align="center">
-  Built by <a href="https://github.com/Tracekit-Dev">TraceKit</a>
+  原项目由 <a href="https://github.com/Tracekit-Dev">TraceKit</a> 开发
 </p>
