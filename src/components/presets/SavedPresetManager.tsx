@@ -1,5 +1,5 @@
 import { useState, type CSSProperties } from "react";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Info, Pencil, Plus, Trash2 } from "lucide-react";
 import { t, useLocale } from "../../lib/i18n";
 import { createCanvasPreset } from "../../lib/canvas-presets";
 import { useCanvasStore } from "../../stores/canvas.store";
@@ -70,6 +70,10 @@ export default function SavedPresetManager({ onApply }: { onApply: (preset: Canv
   const renamePreset = usePresetStore((state) => state.renamePreset);
   const removePreset = usePresetStore((state) => state.removePreset);
   const [editing, setEditing] = useState<{ id: string | null; name: string } | null>(null);
+  const presetHelp = [
+    t("Save canvas size, background, padding, corners, shadows, borders and frames for one-click reuse. Source images are not included."),
+    t("Uses the selected image's style, or the first image when none is selected. Applies the style to all canvas images."),
+  ].join("\n\n");
 
   const startSaving = () => {
     let count = presets.length + 1;
@@ -82,12 +86,6 @@ export default function SavedPresetManager({ onApply }: { onApply: (preset: Canv
 
   return (
     <div className="space-y-2">
-      <p className="text-[11px] leading-relaxed text-zinc-500">
-        {t("Save canvas size, background, padding, corners, shadows, borders and frames for one-click reuse. Source images are not included.")}
-      </p>
-      <p className="text-[11px] leading-relaxed text-zinc-500">
-        {t("Uses the selected image's style, or the first image when none is selected. Applies the style to all canvas images.")}
-      </p>
       {editing?.id === null ? (
         <PresetNameForm
           key="new-preset"
@@ -99,10 +97,16 @@ export default function SavedPresetManager({ onApply }: { onApply: (preset: Canv
           onCancel={() => setEditing(null)}
         />
       ) : (
-        <button type="button" onClick={startSaving} className={`${buttonClass} flex w-full items-center justify-center gap-1.5 bg-zinc-800/60 py-2 text-zinc-300 hover:bg-zinc-700/60`}>
-          <Plus size={14} aria-hidden="true" />
-          {t("Save current style")}
-        </button>
+        <div className="flex items-center gap-1">
+          <button type="button" onClick={startSaving} title={presetHelp} className={`${buttonClass} flex flex-1 items-center justify-center gap-1.5 bg-zinc-800/60 py-2 text-zinc-300 hover:bg-zinc-700/60`}>
+            <Plus size={14} aria-hidden="true" />
+            {t("Save current style")}
+          </button>
+          <button type="button" title={presetHelp} aria-label={t("About presets")} aria-description={presetHelp}
+            className={`${buttonClass} shrink-0 text-zinc-500 hover:text-zinc-200`}>
+            <Info size={14} aria-hidden="true" />
+          </button>
+        </div>
       )}
 
       {presets.length === 0 && <p className="text-[11px] text-zinc-500">{t("No saved presets")}</p>}

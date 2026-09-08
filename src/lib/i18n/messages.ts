@@ -126,6 +126,7 @@ export const zhCN: Record<string, string> = {
   "Save Current as Preset": "将当前样式存为预设",
   "Save current style": "保存当前样式",
   "Preset name": "预设名称",
+  "About presets": "预设说明",
   "Cancel": "取消",
   "Apply preset {name}": "应用预设 {name}",
   "Rename preset {name}": "重命名预设 {name}",
