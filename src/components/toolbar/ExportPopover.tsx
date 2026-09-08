@@ -1,13 +1,15 @@
 import { t, useLocale } from "../../lib/i18n";
 import { useState, useRef, useEffect } from "react";
-import { useCanvasStore } from "../../stores/canvas.store";
 import { exportCanvas, type ExportFormat, type ExportStatus } from "../../ipc/export";
 import { saveProject } from "../../lib/project-file";
 import { shareFile } from "../../ipc/share";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
 import { Image } from "@tauri-apps/api/image";
 import Konva from "konva";
-import { exportStageImage } from "../../lib/export-stage";
+import { editorExportPixels, editorExportPng } from "../../lib/editor-export";
+import type { ExportScale } from "../../lib/export-resolution";
+import { useExportResolution } from "../../hooks/useExportResolution";
+import ExportScaleControl from "../toolbar/ExportScaleControl";
 
 interface ExportPopoverProps {
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -21,11 +23,11 @@ export default function ExportPopover({ stageRef, anchorEl, onClose }: ExportPop
   const [visible, setVisible] = useState(false);
   const [format, setFormat] = useState<ExportFormat>("png");
   const [quality, setQuality] = useState(90);
-  const [scale, setScale] = useState(1);
+  const [scale, setScale] = useState<ExportScale>("auto");
+  const resolution = useExportResolution(scale);
+  const [error, setError] = useState("");
   const [exporting, setExporting] = useState(false);
   const [lastExport, setLastExport] = useState<ExportStatus | null>(null);
-  const canvasWidth = useCanvasStore((s) => s.canvasWidth);
-  const canvasHeight = useCanvasStore((s) => s.canvasHeight);
 
   // Animate in
   useEffect(() => {
@@ -62,39 +64,21 @@ export default function ExportPopover({ stageRef, anchorEl, onClose }: ExportPop
     if (!stage) return;
 
     setExporting(true);
+    setError("");
     try {
-      const currentZoomScale = stage.scaleX();
-      const exportPixelRatio = scale / currentZoomScale;
-
-      const dataUrl = exportStageImage(stage, {
-        pixelRatio: exportPixelRatio,
-        mimeType: format === "png" ? "image/png" : "image/jpeg",
-        quality: quality / 100,
-      });
-
-      const img = new window.Image();
-      img.src = dataUrl;
-      await new Promise<void>((resolve) => { img.onload = () => resolve(); });
-
-      const outW = canvasWidth * scale;
-      const outH = canvasHeight * scale;
-      const canvas = document.createElement("canvas");
-      canvas.width = outW;
-      canvas.height = outH;
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, outW, outH);
-      const imageData = ctx.getImageData(0, 0, outW, outH);
+      const imageData = editorExportPixels(stage, resolution, format === "jpeg");
 
       const result = await exportCanvas(
         new Uint8Array(imageData.data.buffer),
-        outW,
-        outH,
+        imageData.width,
+        imageData.height,
         { format, quality, scale: 1 },
       );
 
       if (result) setLastExport({ kind: "image", path: result });
     } catch (err) {
       console.error("Export failed:", err);
+      setError(err instanceof Error ? err.message : "Export failed. Please try a smaller output size.");
     } finally {
       setExporting(false);
     }
@@ -105,9 +89,8 @@ export default function ExportPopover({ stageRef, anchorEl, onClose }: ExportPop
     if (!stage) return;
 
     try {
-      const currentScale = stage.scaleX();
-      const pixelRatio = scale / currentScale;
-      const dataUrl = exportStageImage(stage, { pixelRatio, mimeType: "image/png" });
+      setError("");
+      const dataUrl = editorExportPng(stage, resolution);
       const base64 = dataUrl.split(",")[1] ?? "";
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);
@@ -118,6 +101,7 @@ export default function ExportPopover({ stageRef, anchorEl, onClose }: ExportPop
       setTimeout(() => setLastExport(null), 2000);
     } catch (err) {
       console.error("Copy to clipboard failed:", err);
+      setError(err instanceof Error ? err.message : "Export failed. Please try a smaller output size.");
     }
   };
 
@@ -146,7 +130,7 @@ export default function ExportPopover({ stageRef, anchorEl, onClose }: ExportPop
       </div>
 
       {/* Quality */}
-      {format !== "png" && (
+      {format === "jpeg" && (
         <div className="flex items-center gap-2">
           <label className="text-[11px] text-zinc-500 w-12">{t("Quality")}</label>
           <input
@@ -161,29 +145,8 @@ export default function ExportPopover({ stageRef, anchorEl, onClose }: ExportPop
         </div>
       )}
 
-      {/* Scale */}
-      <div className="flex items-center gap-2">
-        <label className="text-[11px] text-zinc-500 w-12">{t("Scale")}</label>
-        <div className="flex gap-1">
-          {[1, 2, 3].map((s) => (
-            <button
-              key={s}
-              onClick={() => setScale(s)}
-              className={`px-2 py-1 text-[12px] rounded-md transition-colors duration-150 ${
-                scale === s
-                  ? "bg-zinc-100 text-zinc-900"
-                  : "bg-zinc-800/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-700/60"
-              }`}
-            >
-              {s}x
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <p className="text-[11px] text-zinc-500">
-        {t("Output:")} {canvasWidth * scale} x {canvasHeight * scale}
-      </p>
+      <ExportScaleControl value={scale} onChange={setScale} resolution={resolution} />
+      {error && <p role="alert" className="text-xs text-red-300">{t(error)}</p>}
 
       {/* Export button */}
       <button

@@ -2,6 +2,13 @@ import { batchMessages } from "./batch-messages";
 // English source messages are stable translation keys. Keep user content out of this catalog.
 export const zhCN: Record<string, string> = {
   ...batchMessages,
+  "Export resolution": "导出分辨率",
+  "High resolution (auto)": "高清（自动）",
+  "Auto resolution is limited to 32 megapixels and 8192 px per side.": "自动高清最高支持 3200 万像素，单边不超过 8192 像素。",
+  "This size reduces image detail. Choose automatic resolution to preserve it.": "此尺寸会缩小原图、减少细节，建议选择自动高清。",
+  "Matches source image resolution while keeping your composition.": "根据图片原始分辨率匹配清晰度，保持当前构图。",
+  "Exports at the selected multiple of the canvas size.": "按所选倍数导出画布尺寸。",
+  "Export failed. Please try a smaller output size.": "导出失败，请尝试减小输出尺寸。",
   "Editor toolbar": "编辑工具栏",
   "Canvas zoom": "画布缩放",
   "Zoom out": "缩小",

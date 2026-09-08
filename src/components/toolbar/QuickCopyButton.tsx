@@ -4,7 +4,9 @@ import { Copy, Check } from "lucide-react";
 import { writeImage } from "@tauri-apps/plugin-clipboard-manager";
 import { Image } from "@tauri-apps/api/image";
 import Konva from "konva";
-import { exportStageImage } from "../../lib/export-stage";
+import { editorExportPng } from "../../lib/editor-export";
+import { editorExportResolution } from "../../lib/export-resolution";
+import { useCanvasStore } from "../../stores/canvas.store";
 
 interface QuickCopyButtonProps {
   stageRef: React.RefObject<Konva.Stage | null>;
@@ -19,9 +21,8 @@ export default function QuickCopyButton({ stageRef }: QuickCopyButtonProps) {
     if (!stage) return;
 
     try {
-      const currentScale = stage.scaleX();
-      const pixelRatio = 2 / currentScale;
-      const dataUrl = exportStageImage(stage, { pixelRatio, mimeType: "image/png" });
+      const resolution = editorExportResolution(useCanvasStore.getState());
+      const dataUrl = editorExportPng(stage, resolution);
       const base64 = dataUrl.split(",")[1] ?? "";
       const binary = atob(base64);
       const bytes = new Uint8Array(binary.length);

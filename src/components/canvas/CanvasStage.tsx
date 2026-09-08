@@ -147,6 +147,8 @@ export default function CanvasStage({ stageRef, zoom, setZoom, onBackgroundClick
 
       updateImage(selectedImage.id, {
         src: newSrc,
+        naturalWidth: sw,
+        naturalHeight: sh,
         width: cropRect.width,
         height: cropRect.height,
         x: cropRect.x + cropRect.width / 2,
