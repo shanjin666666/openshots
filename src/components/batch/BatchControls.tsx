@@ -6,6 +6,7 @@ import { BUILTIN_IMAGE_PRESETS } from "../../lib/builtin-image-presets";
 import { usePresetStore } from "../../stores/preset.store";
 import { useBatchStore } from "../../stores/batch.store";
 import { EDITOR_STYLE_KEY } from "../../lib/batch/presets";
+import type { ExportScale } from "../../lib/export-resolution";
 import { type FrameType, getFrameConfig } from "../composition/frames";
 import { t, useLocale } from "../../lib/i18n";
 
@@ -84,6 +85,13 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
       </select>
       {s.sizeMode === "fixed" && <><NumberField label={t("Width")} value={s.width} min={64} max={8192} onChange={(width) => onChange({ width })} />
         <NumberField label={t("Height")} value={s.height} min={64} max={8192} onChange={(height) => onChange({ height })} /></>}
+      <label className="block space-y-2 text-xs text-zinc-400" title={t("Canvas dimensions set the composition. Auto matches each source image; 1x exports the exact canvas dimensions.")}>
+        <span>{t("Export resolution")}</span>
+        <select aria-label={t("Export resolution")} className={inputClass} value={s.exportScale ?? "auto"} onChange={(event) => onChange({ exportScale: event.target.value === "auto" ? "auto" : Number(event.target.value) as ExportScale })}>
+          <option value="auto">{t("High resolution (auto)")}</option>
+          <option value="1">1x</option><option value="2">2x</option><option value="3">3x</option>
+        </select>
+      </label>
       <NumberField label={t("Padding")} value={s.padding} max={1024} onChange={(padding) => onChange({ padding })} />
       <NumberField label={t("Image size (%)")} value={s.imageScale} min={10} max={100} onChange={(imageScale) => onChange({ imageScale })} />
       <div className="flex justify-between items-center gap-3"><span className="text-xs text-zinc-400">{t("Image position")}</span>

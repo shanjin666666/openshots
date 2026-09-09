@@ -1,6 +1,7 @@
 import type { CanvasBackground, CanvasImage } from "../../stores/canvas.store";
 import { DEVICE_MOCKUP_FRAMES, WINDOW_CHROME_FRAMES } from "../../components/composition/frames";
 import { imageFrameSize } from "../image-geometry";
+import type { ExportScale } from "../export-resolution";
 
 export type BatchPosition = "top-left" | "top" | "top-right" | "left" | "center" | "right" | "bottom-left" | "bottom" | "bottom-right";
 export const BATCH_POSITIONS: BatchPosition[] = ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"];
@@ -21,6 +22,7 @@ export interface BatchSettings {
   border: CanvasImage["insetBorder"];
   frame?: CanvasImage["frame"];
   format: "png" | "jpeg";
+  exportScale?: ExportScale;
 }
 
 export const DEFAULT_BATCH_SETTINGS: BatchSettings = {
@@ -30,6 +32,7 @@ export const DEFAULT_BATCH_SETTINGS: BatchSettings = {
   shadow: { enabled: true, color: "rgba(0,0,0,0.3)", blur: 24, offsetX: 0, offsetY: 10 },
   border: { enabled: false, color: "#ffffff", width: 1 },
   format: "png",
+  exportScale: "auto",
 };
 
 function frameBounds(imageWidth: number, imageHeight: number, settings: BatchSettings) {

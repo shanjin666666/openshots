@@ -20,7 +20,7 @@ export const useBatchStore = create<{
   activePresetKey: null,
   setSettings: (patch) => set((state) => ({
     settings: { ...state.settings, ...patch },
-    activePresetKey: Object.entries(patch).some(([key, value]) => key !== "format" && value !== state.settings[key as keyof BatchSettings])
+    activePresetKey: Object.entries(patch).some(([key, value]) => key !== "format" && key !== "exportScale" && value !== state.settings[key as keyof BatchSettings])
       ? null : state.activePresetKey,
   })),
   applyPreset: (preset, key) => set((state) => ({

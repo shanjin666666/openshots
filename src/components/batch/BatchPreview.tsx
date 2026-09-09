@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { readImageFile } from "../../ipc/capture";
 import { loadBatchImage, renderBatchImage } from "../../lib/batch/render";
-import { batchLayout, type BatchSettings } from "../../lib/batch/layout";
+import type { BatchSettings } from "../../lib/batch/layout";
+import { batchExportResolution } from "../../lib/batch/resolution";
 import { batchPreviewSize, type BatchPreviewMode } from "../../lib/batch/preview";
 import { t, useLocale } from "../../lib/i18n";
 
@@ -15,7 +16,7 @@ export default function BatchPreview({ path, settings, paused }: { path: string 
   const [loadError, setLoadError] = useState("");
   const [backgroundError, setBackgroundError] = useState("");
   const [renderError, setRenderError] = useState("");
-  const [preview, setPreview] = useState<{ url: string; width: number; height: number; displayWidth: number; displayHeight: number } | null>(null);
+  const [preview, setPreview] = useState<{ url: string; width: number; height: number; displayWidth: number; displayHeight: number; limited: boolean; downsampled: boolean } | null>(null);
 
   useEffect(() => {
     const element = viewportRef.current!;
@@ -74,7 +75,7 @@ export default function BatchPreview({ path, settings, paused }: { path: string 
     const timer = setTimeout(() => {
       let canvas: HTMLCanvasElement | undefined;
       try {
-        const { width, height } = batchLayout(source.naturalWidth, source.naturalHeight, settings);
+        const { width, height, limited, downsampled } = batchExportResolution(source.naturalWidth, source.naturalHeight, settings);
         const size = batchPreviewSize(width, height, viewport.width, viewport.height, viewport.density, mode);
         const result = renderBatchImage(source, settings, background, size.renderEdge);
         canvas = result.canvas;
@@ -82,7 +83,7 @@ export default function BatchPreview({ path, settings, paused }: { path: string 
           if (disposed) return;
           if (!blob) { setRenderError("Unable to render this image"); return; }
           url = URL.createObjectURL(blob);
-          setPreview({ url, width, height, displayWidth: size.displayWidth, displayHeight: size.displayHeight });
+          setPreview({ url, width, height, displayWidth: size.displayWidth, displayHeight: size.displayHeight, limited, downsampled });
         }, "image/png");
       } catch (error) { setRenderError(error instanceof Error ? error.message : String(error)); }
       finally { if (canvas) { canvas.width = 0; canvas.height = 0; } }
@@ -113,6 +114,9 @@ export default function BatchPreview({ path, settings, paused }: { path: string 
         </p>}
       </div>
     </div>
+    {preview && (preview.limited || preview.downsampled) && <p className="text-[11px] text-amber-300 mt-3 text-center">
+      {t(preview.limited ? "Auto resolution is limited to 32 megapixels and 8192 px per side." : "This size reduces image detail. Choose automatic resolution to preserve it.")}
+    </p>}
     <p className="text-[11px] text-zinc-500 mt-4 text-center">{t(mode === "pixels" ? "One output pixel per screen pixel. Scroll to inspect details." : "Each image is exported separately. Source files stay unchanged.")}</p>
   </div>;
 }

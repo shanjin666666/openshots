@@ -4,6 +4,8 @@ import { backgroundImageCrop } from "../background-image";
 import { drawShadowOnly } from "../shadow-render";
 import { batchLayout, type BatchSettings } from "./layout";
 import { createBatchFrame } from "./frames";
+import { batchExportResolution } from "./resolution";
+import { MAX_EXPORT_EDGE, MAX_EXPORT_PIXELS } from "../export-resolution";
 
 export function loadBatchImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -17,8 +19,13 @@ export function loadBatchImage(src: string): Promise<HTMLImageElement> {
 /** One image per stage. Preview and export differ only in render resolution. */
 export function renderBatchImage(source: HTMLImageElement, settings: BatchSettings, backgroundImage: HTMLImageElement | null, previewEdge?: number) {
   const layout = batchLayout(source.naturalWidth, source.naturalHeight, settings);
-  const ratio = previewEdge ? Math.min(1, previewEdge / Math.max(layout.width, layout.height)) : 1;
-  const stage = new Konva.Stage({ container: document.createElement("div"), width: Math.round(layout.width * ratio), height: Math.round(layout.height * ratio) });
+  const resolution = batchExportResolution(source.naturalWidth, source.naturalHeight, settings, layout);
+  if (resolution.width > MAX_EXPORT_EDGE || resolution.height > MAX_EXPORT_EDGE || resolution.width * resolution.height > MAX_EXPORT_PIXELS) {
+    throw new Error("Output exceeds the 32 megapixel or 8192 px limit");
+  }
+  // Render the original source at the output scale; never enlarge a 1x bitmap.
+  const ratio = previewEdge ? Math.min(resolution.scale, previewEdge / Math.max(layout.width, layout.height)) : resolution.scale;
+  const stage = new Konva.Stage({ container: document.createElement("div"), width: Math.ceil(layout.width * ratio), height: Math.ceil(layout.height * ratio) });
   const layer = new Konva.Layer({ listening: false, scaleX: ratio, scaleY: ratio });
   try {
     stage.add(layer);
@@ -61,7 +68,7 @@ export function renderBatchImage(source: HTMLImageElement, settings: BatchSettin
     layer.add(group);
     layer.draw();
     const canvas = stage.toCanvas({ pixelRatio: 1 });
-    return { canvas, width, height };
+    return { canvas, width: resolution.width, height: resolution.height };
   } finally {
     stage.destroy();
   }

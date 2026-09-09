@@ -77,12 +77,13 @@ describe("presets shared by the editor and batch beautification", () => {
 
   it("keeps queue and output choices when applying presets, and tracks the selected preset by stable ID", () => {
     const items = [{ path: "/tmp/source.png", name: "source.png", status: "pending" as const }];
-    useBatchStore.setState({ items, selectedPath: items[0]!.path, directory: "/tmp/results", settings: { ...DEFAULT_BATCH_SETTINGS, format: "jpeg" } });
+    useBatchStore.setState({ items, selectedPath: items[0]!.path, directory: "/tmp/results", settings: { ...DEFAULT_BATCH_SETTINGS, format: "jpeg", exportScale: 2 } });
     const preset = savedStyle();
     useBatchStore.getState().applyPreset(preset, `saved:${preset.id}`);
     expect(useBatchStore.getState()).toMatchObject({ items, selectedPath: items[0]!.path, directory: "/tmp/results",
-      activePresetKey: `saved:${preset.id}`, settings: { format: "jpeg", sizeMode: "fixed", frame: preset.frame } });
+      activePresetKey: `saved:${preset.id}`, settings: { format: "jpeg", exportScale: 2, sizeMode: "fixed", frame: preset.frame } });
     useBatchStore.getState().setSettings({ format: "png" });
+    useBatchStore.getState().setSettings({ exportScale: "auto" });
     useBatchStore.getState().setSettings({ padding: preset.padding });
     expect(useBatchStore.getState().activePresetKey).toBe(`saved:${preset.id}`);
     useBatchStore.getState().setSettings({ padding: preset.padding + 1 });
@@ -91,10 +92,11 @@ describe("presets shared by the editor and batch beautification", () => {
 
   it("syncs current editor style explicitly without changing queued files", () => {
     useCanvasStore.setState({ images: [image("editor")], canvasWidth: 1600, canvasHeight: 1000 });
+    useBatchStore.getState().setSettings({ exportScale: 3 });
     useBatchStore.getState().addPaths(["/tmp/a.png", "/tmp/b.png"]);
     useBatchStore.getState().useEditorStyle();
     expect(useBatchStore.getState()).toMatchObject({ activePresetKey: EDITOR_STYLE_KEY,
-      settings: { sizeMode: "fixed", width: 1600, height: 1000, frame: image("editor").frame } });
+      settings: { sizeMode: "fixed", width: 1600, height: 1000, frame: image("editor").frame, exportScale: 3 } });
     expect(useBatchStore.getState().items.map((item) => item.path)).toEqual(["/tmp/a.png", "/tmp/b.png"]);
   });
 });
