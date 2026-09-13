@@ -6,6 +6,7 @@ import { batchLayout, type BatchSettings } from "./layout";
 import { createBatchFrame } from "./frames";
 import { batchExportResolution } from "./resolution";
 import { MAX_EXPORT_EDGE, MAX_EXPORT_PIXELS } from "../export-resolution";
+import { clipImageCorners, imageCornerRadii, type CornerRadii } from "../image-corners";
 
 export function loadBatchImage(src: string): Promise<HTMLImageElement> {
   return new Promise((resolve, reject) => {
@@ -32,6 +33,9 @@ export function renderBatchImage(source: HTMLImageElement, settings: BatchSettin
     layer.getCanvas().setPixelRatio(1);
     layer.getHitCanvas().setPixelRatio(1);
     const { width, height, imageWidth, imageHeight, border, x, y, radius, outerWidth, outerHeight, outerRadius, contentX, contentY } = layout;
+    const corners = imageCornerRadii(settings, imageWidth, imageHeight);
+    const shadowCorners: number | CornerRadii = layout.chromeHeight > 0
+      ? [outerRadius, outerRadius, corners[2], corners[3]] : outerRadius;
     const bg = settings.background;
     if (settings.format === "jpeg") layer.add(new Konva.Rect({ width, height, fill: "#ffffff" }));
     if (bg.type === "image" && !backgroundImage) throw new Error("Choose a background image first");
@@ -49,7 +53,7 @@ export function renderBatchImage(source: HTMLImageElement, settings: BatchSettin
     // Cast only the shadow so transparent source pixels remain transparent.
     if (settings.shadow.enabled) {
       layer.add(new Konva.Shape({ x, y, width: outerWidth, height: outerHeight,
-        sceneFunc: (ctx) => drawShadowOnly(ctx._context, outerWidth, outerHeight, outerRadius, settings.shadow),
+        sceneFunc: (ctx) => drawShadowOnly(ctx._context, outerWidth, outerHeight, shadowCorners, settings.shadow),
       }));
     }
     if (border > 0) layer.add(new Konva.Rect({ ...outer, fill: settings.border.color }));
@@ -58,12 +62,8 @@ export function renderBatchImage(source: HTMLImageElement, settings: BatchSettin
       frame.position({ x, y });
       layer.add(frame);
     }
-    const group = new Konva.Group({ x: x + contentX, y: y + contentY, clipFunc: radius > 0 ? (ctx) => {
-      ctx.beginPath();
-      ctx.moveTo(radius, 0); ctx.arcTo(imageWidth, 0, imageWidth, imageHeight, radius);
-      ctx.arcTo(imageWidth, imageHeight, 0, imageHeight, radius); ctx.arcTo(0, imageHeight, 0, 0, radius);
-      ctx.arcTo(0, 0, imageWidth, 0, radius); ctx.closePath();
-    } : undefined });
+    const group = new Konva.Group({ x: x + contentX, y: y + contentY,
+      clipFunc: radius > 0 ? (ctx) => clipImageCorners(ctx, imageWidth, imageHeight, corners) : undefined });
     group.add(new Konva.Image({ image: source, width: imageWidth, height: imageHeight }));
     layer.add(group);
     layer.draw();

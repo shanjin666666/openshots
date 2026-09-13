@@ -9,6 +9,7 @@ import { WindowChrome } from "../../composition/WindowChrome";
 import { DeviceMockup } from "../../composition/DeviceMockup";
 import type { Guide } from "../GuidesLayer";
 import { drawShadowOnly } from "../../../lib/shadow-render";
+import { clipImageCorners, imageCornerRadii } from "../../../lib/image-corners";
 
 const SNAP_THRESHOLD = 8; // per D-10
 
@@ -188,8 +189,8 @@ export default function ScreenshotNode({
     });
   };
 
-  // Effective corner radius: disabled when device frame is active
-  const effectiveCornerRadius = hasDevice ? 0 : Math.max(0, Math.min(data.cornerRadius, displayWidth / 2, displayHeight / 2));
+  const corners = imageCornerRadii(data, displayWidth, displayHeight);
+  const effectiveCornerRadius = corners[2];
 
   // Render the image content (shared between framed and unframed)
   const renderImageContent = (offsetX: number, offsetY: number) => (
@@ -213,22 +214,7 @@ export default function ScreenshotNode({
         y={offsetY + (hasDevice || hasChrome ? 0 : bw)}
         clipFunc={
           effectiveCornerRadius > 0
-            ? (ctx) => {
-                const r = effectiveCornerRadius;
-                const w = displayWidth;
-                const h = displayHeight;
-                ctx.beginPath();
-                ctx.moveTo(r, 0);
-                ctx.lineTo(w - r, 0);
-                ctx.arcTo(w, 0, w, r, r);
-                ctx.lineTo(w, h - r);
-                ctx.arcTo(w, h, w - r, h, r);
-                ctx.lineTo(r, h);
-                ctx.arcTo(0, h, 0, h - r, r);
-                ctx.lineTo(0, r);
-                ctx.arcTo(0, 0, r, 0, r);
-                ctx.closePath();
-              }
+            ? (ctx) => clipImageCorners(ctx, displayWidth, displayHeight, corners)
             : undefined
         }
       >
@@ -273,7 +259,8 @@ export default function ScreenshotNode({
             width={totalW}
             height={totalH}
             sceneFunc={(context) => drawShadowOnly(context._context, totalW, totalH,
-              hasChrome ? WINDOW_CHROME_FRAMES[frameVariant as "macos" | "windows"].borderRadius
+              hasChrome ? [WINDOW_CHROME_FRAMES[frameVariant as "macos" | "windows"].borderRadius,
+                WINDOW_CHROME_FRAMES[frameVariant as "macos" | "windows"].borderRadius, corners[2], corners[3]]
                 : hasDevice ? DEVICE_MOCKUP_FRAMES[frameVariant as "iphone" | "ipad" | "macbook"].bezelRadius
                   : effectiveCornerRadius + bw, data.shadow)}
             listening={false}

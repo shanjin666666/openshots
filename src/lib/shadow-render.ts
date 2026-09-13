@@ -1,15 +1,17 @@
 import type { CanvasImage } from "../stores/canvas.store";
+import type { CornerRadii } from "./image-corners";
 
 /** Draw only the outside shadow, leaving transparent image pixels and other layers intact. */
 export function drawShadowOnly(
   context: CanvasRenderingContext2D,
   width: number,
   height: number,
-  radius: number,
+  radius: number | CornerRadii,
   shadow: CanvasImage["shadow"],
 ): void {
   if (!shadow.enabled || width <= 0 || height <= 0) return;
-  const cornerRadius = Math.max(0, Math.min(radius, width / 2, height / 2));
+  const clamp = (value: number) => Math.max(0, Math.min(value, width / 2, height / 2));
+  const cornerRadius = typeof radius === "number" ? clamp(radius) : radius.map(clamp);
   const transform = context.getTransform();
   const scale = Math.max(Math.hypot(transform.a, transform.b), Math.hypot(transform.c, transform.d));
   const margin = Math.max(0, shadow.blur) * 4 + Math.abs(shadow.offsetX) + Math.abs(shadow.offsetY) + 2;
