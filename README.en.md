@@ -112,6 +112,7 @@ Open **Batch beautify** (批量美化), add multiple PNG/JPEG/WebP/BMP images, t
 
 - Share built-in and saved presets with the single-image editor. Applying a preset uses its canvas size, background, padding, corners, shadow, border and frame, or copy the editor's current style directly.
 - Keep each original image's pixel dimensions plus padding, or fit every image to a fixed canvas. Choose one of nine positions and adjust image size without stretching or cropping.
+- **Match source aspect ratio** gives each upload a canvas with its own proportions and padding inside. The editor also offers this option under Canvas Size, using the selected image's original ratio or the first image when none is selected.
 - **High resolution (auto)** is the default: canvas dimensions define the composition, while output pixels match each source to preserve its detail. The preview header shows actual output dimensions. Choose 1x, 2x, or 3x when every output must have the same exact dimensions.
 - Files are named `original-styled.png` (or `.jpg`), with numeric suffixes on collisions. Originals and existing files are never overwritten.
 - Processing is sequential to limit memory use. Stop between images, inspect individual failures, and retry failed items. Successfully written images are retained when stopping.

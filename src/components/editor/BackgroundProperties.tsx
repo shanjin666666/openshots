@@ -5,6 +5,7 @@ import type { CanvasPreset } from "../../stores/preset.store";
 import { applyCanvasPreset } from "../../lib/canvas-presets";
 import SavedPresetManager from "../presets/SavedPresetManager";
 import { ASPECT_RATIOS, canvasSize } from "../../lib/aspectRatios";
+import SourceAspectRatioButton from "../panels/SourceAspectRatioButton";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl, type SystemWallpaper } from "../../ipc/capture";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -206,6 +207,7 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
               </button>
             );
           })}
+          <SourceAspectRatioButton onResize={resizeCanvas} />
         </div>
 
         {/* W/H inputs */}

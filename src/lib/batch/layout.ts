@@ -2,6 +2,7 @@ import type { CanvasBackground, CanvasImage } from "../../stores/canvas.store";
 import { DEVICE_MOCKUP_FRAMES, WINDOW_CHROME_FRAMES } from "../../components/composition/frames";
 import { imageFrameSize } from "../image-geometry";
 import type { ExportScale } from "../export-resolution";
+import { sourceCanvasSize } from "../aspectRatios";
 
 export type BatchPosition = "top-left" | "top" | "top-right" | "left" | "center" | "right" | "bottom-left" | "bottom" | "bottom-right";
 export const BATCH_POSITIONS: BatchPosition[] = ["top-left", "top", "top-right", "left", "center", "right", "bottom-left", "bottom", "bottom-right"];
@@ -10,7 +11,7 @@ export const POSITION_LABELS: Record<BatchPosition, string> = {
   "bottom-left": "Bottom left", bottom: "Bottom", "bottom-right": "Bottom right",
 };
 export interface BatchSettings {
-  sizeMode: "original" | "fixed";
+  sizeMode: "original" | "source-ratio" | "fixed";
   width: number;
   height: number;
   padding: number;
@@ -67,15 +68,21 @@ export function batchLayout(sourceWidth: number, sourceHeight: number, settings:
     throw new Error("Invalid batch dimensions");
   }
   const original = frameBounds(sourceWidth, sourceHeight, settings);
-  const width = settings.sizeMode === "original" ? Math.ceil(original.outerWidth + padding * 2) : Math.round(settings.width);
-  const height = settings.sizeMode === "original" ? Math.ceil(original.outerHeight + padding * 2) : Math.round(settings.height);
   const emptyFrame = frameBounds(0, 0, settings);
+  // Keep padding inside the matching-ratio canvas. Small uploads need a larger
+  // logical canvas so the requested padding and frame still leave image space.
+  const sourceCanvas = settings.sizeMode === "source-ratio"
+    ? sourceCanvasSize(sourceWidth, sourceHeight, Math.max(100, padding * 4,
+      padding * 2 + emptyFrame.outerWidth + 100, padding * 2 + emptyFrame.outerHeight + 100)) : null;
+  if (settings.sizeMode === "source-ratio" && !sourceCanvas) throw new Error("Invalid batch dimensions");
+  const width = settings.sizeMode === "original" ? Math.ceil(original.outerWidth + padding * 2) : sourceCanvas?.width ?? Math.round(settings.width);
+  const height = settings.sizeMode === "original" ? Math.ceil(original.outerHeight + padding * 2) : sourceCanvas?.height ?? Math.round(settings.height);
   const innerWidth = width - padding * 2;
   const innerHeight = height - padding * 2;
   if (innerWidth <= emptyFrame.outerWidth || innerHeight <= emptyFrame.outerHeight) throw new Error("Canvas is too small for this padding");
   if (width > 8192 || height > 8192 || width * height > 32_000_000) throw new Error("Output exceeds the 32 megapixel or 8192 px limit");
   let fit = 1;
-  if (settings.sizeMode === "fixed") {
+  if (settings.sizeMode !== "original") {
     if (!original.deviceInsets) {
       fit = Math.min((innerWidth - emptyFrame.outerWidth) / sourceWidth, (innerHeight - emptyFrame.outerHeight) / sourceHeight);
     } else {

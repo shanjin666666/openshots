@@ -2,6 +2,10 @@ import { batchMessages } from "./batch-messages";
 // English source messages are stable translation keys. Keep user content out of this catalog.
 export const zhCN: Record<string, string> = {
   ...batchMessages,
+  "Match source aspect ratio": "原图比例",
+  "Add an image to use its aspect ratio.": "添加图片后，即可使用原图比例。",
+  "This image aspect ratio exceeds the supported canvas dimensions.": "这张图片的比例超出支持的画布尺寸范围。",
+  "Match the selected image's original aspect ratio, or the first image when none is selected.": "按选中图片的原始宽高比设置画布；未选中图片时使用第一张图片。",
   "Export resolution": "导出分辨率",
   "High resolution (auto)": "高清（自动）",
   "Auto resolution is limited to 32 megapixels and 8192 px per side.": "自动高清最高支持 3200 万像素，单边不超过 8192 像素。",

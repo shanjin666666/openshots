@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { batchLayout, BATCH_POSITIONS, DEFAULT_BATCH_SETTINGS, type BatchSettings } from "./layout";
 import { imageFrameSize } from "../image-geometry";
 import { DEVICE_MOCKUP_FRAMES } from "../../components/composition/frames";
+import { batchExportResolution } from "./resolution";
 
 const settings = () => structuredClone(DEFAULT_BATCH_SETTINGS);
 describe("batch placement", () => {
@@ -44,6 +45,78 @@ const frames: NonNullable<BatchSettings["frame"]>[] = [
   { type: "device-mockup", variant: "ipad" },
   { type: "device-mockup", variant: "macbook" },
 ];
+
+describe("batch source aspect ratio", () => {
+  it("uses each upload's own canvas proportions and keeps padding inside", () => {
+    const config: BatchSettings = { ...settings(), sizeMode: "source-ratio", width: 1600, height: 883, padding: 30 };
+    for (const [width, height] of [[1920, 1080], [900, 1600], [1200, 1200], [4000, 1000]]) {
+      const layout = batchLayout(width!, height!, config);
+      expect(layout.width).toBe(width);
+      expect(layout.height).toBe(height);
+      expect(layout.width / layout.height).toBeCloseTo(width! / height!);
+      expect(layout.imageWidth / layout.imageHeight).toBeCloseTo(width! / height!);
+      expect(layout.x).toBeGreaterThanOrEqual(30);
+      expect(layout.y).toBeGreaterThanOrEqual(30);
+      expect(layout.x + layout.outerWidth).toBeLessThanOrEqual(width! - 30 + 1e-9);
+      expect(layout.y + layout.outerHeight).toBeLessThanOrEqual(height! - 30 + 1e-9);
+    }
+    expect(config).toMatchObject({ sizeMode: "source-ratio", width: 1600, height: 883 });
+  });
+
+  it("scales large source canvases uniformly while automatic export retains their source detail", () => {
+    const config: BatchSettings = { ...settings(), sizeMode: "source-ratio", padding: 30 };
+    const layout = batchLayout(6000, 3000, config);
+    expect(layout).toMatchObject({ width: 4000, height: 2000 });
+    const resolution = batchExportResolution(6000, 3000, config, layout);
+    expect(resolution.limited).toBe(false);
+    expect(resolution.downsampled).toBe(false);
+    expect(layout.imageWidth * resolution.scale).toBeCloseTo(6000);
+    expect(layout.imageHeight * resolution.scale).toBeCloseTo(3000);
+    expect(resolution.width / resolution.height).toBeCloseTo(2, 3);
+    expect(batchExportResolution(6000, 3000, { ...config, exportScale: 1 }, layout))
+      .toMatchObject({ width: 4000, height: 2000, downsampled: true });
+  });
+
+  it.each(frames)("fits the entire $variant frame at all nine positions without changing the source ratio", (frame) => {
+    for (const [sourceWidth, sourceHeight] of [[1920, 1080], [1080, 1920], [501, 501]]) {
+      for (const position of BATCH_POSITIONS) {
+        const config: BatchSettings = { ...settings(), sizeMode: "source-ratio", frame, padding: 11, position,
+          imageScale: 70, border: { enabled: true, width: 13, color: "#fff" } };
+        const layout = batchLayout(sourceWidth!, sourceHeight!, config);
+        expect(layout.width / layout.height).toBeCloseTo(sourceWidth! / sourceHeight!);
+        expect(layout.imageWidth / layout.imageHeight).toBeCloseTo(sourceWidth! / sourceHeight!);
+        expect(layout.x).toBeGreaterThanOrEqual(11);
+        expect(layout.y).toBeGreaterThanOrEqual(11);
+        expect(layout.x + layout.outerWidth).toBeLessThanOrEqual(layout.width - 11 + 1e-9);
+        expect(layout.y + layout.outerHeight).toBeLessThanOrEqual(layout.height - 11 + 1e-9);
+        if (position.includes("left")) expect(layout.x).toBe(11);
+        if (position.includes("right")) expect(layout.x + layout.outerWidth).toBeCloseTo(layout.width - 11);
+        if (position.includes("top")) expect(layout.y).toBe(11);
+        if (position.includes("bottom")) expect(layout.y + layout.outerHeight).toBeCloseTo(layout.height - 11);
+      }
+    }
+  });
+
+  it("expands small canvases proportionally to make room for padding and frame", () => {
+    const config: BatchSettings = { ...settings(), sizeMode: "source-ratio", frame: frames[0] };
+    const layout = batchLayout(80, 60, config);
+    expect(layout.width / layout.height).toBeCloseTo(4 / 3, 2);
+    expect(layout.imageWidth).toBeGreaterThan(0);
+    expect(layout.imageHeight).toBeGreaterThan(0);
+    expect(layout.x).toBeGreaterThanOrEqual(config.padding);
+    expect(layout.y).toBeGreaterThanOrEqual(config.padding);
+    expect(layout.x + layout.outerWidth).toBeLessThanOrEqual(layout.width - config.padding + 1e-9);
+    expect(layout.y + layout.outerHeight).toBeLessThanOrEqual(layout.height - config.padding + 1e-9);
+    expect(config.padding).toBe(64);
+  });
+
+  it("reports source ratios that cannot fit the supported bounds instead of stretching the source", () => {
+    const config: BatchSettings = { ...settings(), sizeMode: "source-ratio" };
+    expect(() => batchLayout(100000, 1, config)).toThrow("Invalid batch dimensions");
+    expect(() => batchLayout(4000, 100, { ...config, padding: 1024 })).toThrow("Invalid batch dimensions");
+    expect(() => batchLayout(0, 1080, config)).toThrow("Invalid batch dimensions");
+  });
+});
 
 describe("batch frames", () => {
   it.each(frames)("preserves source pixels with $variant and grows the original-size canvas", (frame) => {

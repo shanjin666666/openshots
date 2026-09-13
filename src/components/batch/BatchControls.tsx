@@ -80,7 +80,10 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
     </section>
     <section className="space-y-3 border-t border-zinc-800 pt-4">
       <h2 className="text-sm font-medium">{t("Canvas and position")}</h2>
-      <select aria-label={t("Canvas size mode")} className={inputClass} value={s.sizeMode} onChange={(event) => onChange({ sizeMode: event.target.value as "original" | "fixed" })}>
+      <select aria-label={t("Canvas size mode")} className={inputClass} value={s.sizeMode}
+        title={t("Match source aspect ratio uses each image's own proportions, with padding inside the canvas.")}
+        onChange={(event) => onChange({ sizeMode: event.target.value as BatchSettings["sizeMode"] })}>
+        <option value="source-ratio">{t("Match source aspect ratio")}</option>
         <option value="original">{t("Original image + padding")}</option><option value="fixed">{t("Fixed canvas size")}</option>
       </select>
       {s.sizeMode === "fixed" && <><NumberField label={t("Width")} value={s.width} min={64} max={8192} onChange={(width) => onChange({ width })} />

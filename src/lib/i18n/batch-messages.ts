@@ -38,6 +38,7 @@ export const batchMessages: Record<string, string> = {
   "Canvas size mode": "画布尺寸模式",
   "Original image + padding": "原图尺寸 + 四周留白",
   "Fixed canvas size": "统一画布尺寸",
+  "Match source aspect ratio uses each image's own proportions, with padding inside the canvas.": "按每张上传图片的原始比例设置画布，留白放在画布以内。",
   "Canvas dimensions set the composition. Auto matches each source image; 1x exports the exact canvas dimensions.": "画布尺寸用于构图。自动模式按每张原图匹配导出像素；1x 按画布尺寸原样导出。",
   "Image size (%)": "图片大小（%）",
   "Image position": "图片位置",

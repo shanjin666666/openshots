@@ -1,6 +1,7 @@
 import { t, useLocale } from "../../lib/i18n";
 import { useCanvasStore } from "../../stores/canvas.store";
 import { ASPECT_RATIOS, canvasSize } from "../../lib/aspectRatios";
+import SourceAspectRatioButton from "./SourceAspectRatioButton";
 
 export default function AspectRatioPanel() {
   useLocale();
@@ -34,6 +35,7 @@ export default function AspectRatioPanel() {
             </button>
           );
         })}
+        <SourceAspectRatioButton onResize={setCanvasSize} />
       </div>
       <p className="text-[11px] text-zinc-500">
         {canvasWidth} × {canvasHeight}
