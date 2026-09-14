@@ -89,7 +89,7 @@ export default function ScreenshotNode({
   const hasChrome = frameCategory === "window-chrome";
   const hasDevice = frameCategory === "device-mockup";
 
-  const bw = data.insetBorder.enabled ? data.insetBorder.width : 0;
+  const bw = !hasChrome && !hasDevice && data.insetBorder.enabled ? data.insetBorder.width : 0;
 
   // Calculate total dimensions including frame
   let totalW: number;

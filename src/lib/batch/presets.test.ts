@@ -75,6 +75,21 @@ describe("presets shared by the editor and batch beautification", () => {
     expect(patch).toMatchObject({ width: editor.canvasWidth, height: editor.canvasHeight, padding: editor.padding, border: editor.images[0]!.insetBorder });
   });
 
+  it("shares fixed pixel padding with batch without imposing a preset canvas or reducing large padding", () => {
+    const preset = { ...savedStyle(), canvasSizeMode: "padding" as const, canvasWidth: 80, canvasHeight: 60,
+      padding: 1000, frame: null, insetBorderEnabled: false };
+    const settings = { ...DEFAULT_BATCH_SETTINGS, ...batchSettingsFromPreset(preset, DEFAULT_BATCH_SETTINGS) };
+    expect(settings).toMatchObject({ sizeMode: "original", padding: 1000, imageScale: 100, position: "center" });
+    expect(batchLayout(80, 60, settings)).toMatchObject({ width: 2080, height: 2060, imageWidth: 80, imageHeight: 60 });
+    expect(batchLayout(1600, 900, settings)).toMatchObject({ width: 3600, height: 2900, imageWidth: 1600, imageHeight: 900 });
+  });
+
+  it("uses the editor's fixed pixel padding behavior while retaining its frame and border style", () => {
+    useCanvasStore.setState({ images: [image("source")], canvasSizeMode: "padding", canvasWidth: 200, canvasHeight: 100, padding: 300 });
+    const patch = batchSettingsFromEditor(useCanvasStore.getState(), DEFAULT_BATCH_SETTINGS);
+    expect(patch).toMatchObject({ sizeMode: "original", padding: 300, border: image("source").insetBorder, frame: image("source").frame });
+  });
+
   it("keeps queue and output choices when applying presets, and tracks the selected preset by stable ID", () => {
     const items = [{ path: "/tmp/source.png", name: "source.png", status: "pending" as const }];
     useBatchStore.setState({ items, selectedPath: items[0]!.path, directory: "/tmp/results", settings: { ...DEFAULT_BATCH_SETTINGS, format: "jpeg", exportScale: 2 } });

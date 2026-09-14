@@ -8,8 +8,9 @@ export default function SourceAspectRatioButton({ onResize }: { onResize: (width
   const selectedId = useCanvasStore((state) => state.selectedId);
   const width = useCanvasStore((state) => state.canvasWidth);
   const height = useCanvasStore((state) => state.canvasHeight);
+  const fixedPadding = useCanvasStore((state) => state.canvasSizeMode === "padding");
   const size = selectedSourceCanvasSize(images, selectedId);
-  const active = size !== null && Math.abs(width * size.height - height * size.width) <= Math.max(size.width, size.height) / 2;
+  const active = !fixedPadding && size !== null && Math.abs(width * size.height - height * size.width) <= Math.max(size.width, size.height) / 2;
   const help = !images.length ? "Add an image to use its aspect ratio."
     : !size ? "This image aspect ratio exceeds the supported canvas dimensions."
       : "Match the selected image's original aspect ratio, or the first image when none is selected.";

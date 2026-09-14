@@ -11,23 +11,23 @@ import { type FrameType, getFrameConfig } from "../composition/frames";
 import { t, useLocale } from "../../lib/i18n";
 
 const inputClass = "w-full bg-zinc-800 border border-zinc-700 rounded-md px-2 py-1.5 text-xs text-zinc-200";
-function NumberField({ label, value, min = 0, max, onChange }: { label: string; value: number; min?: number; max: number; onChange: (n: number) => void }) {
+function NumberField({ label, value, min = 0, max, integer = false, onChange }: { label: string; value: number; min?: number; max: number; integer?: boolean; onChange: (n: number) => void }) {
   const [draft, setDraft] = useState(String(value));
   useEffect(() => setDraft(String(value)), [value]);
   const commit = () => {
     const number = draft.trim() ? Number(draft) : value;
-    const next = Number.isFinite(number) ? Math.min(max, Math.max(min, number)) : value;
+    const next = Number.isFinite(number) ? Math.min(max, Math.max(min, integer ? Math.round(number) : number)) : value;
     setDraft(String(next));
     onChange(next);
   };
   return <label className="flex items-center justify-between gap-3 text-xs text-zinc-400">
-    <span>{label}</span><input aria-label={label} className={`${inputClass} max-w-24`} type="number" min={min} max={max} value={draft}
+    <span>{label}</span><input aria-label={label} className={`${inputClass} max-w-24`} type="number" min={min} max={max} step={integer ? 1 : undefined} value={draft}
       onChange={(event) => {
         const text = event.target.value;
         setDraft(text);
         const number = Number(text);
         // Keep incomplete edits (including a leading minus) until the user finishes typing.
-        if (text.trim() && Number.isFinite(number) && number >= min && number <= max) onChange(number);
+        if (text.trim() && Number.isFinite(number) && number >= min && number <= max && (!integer || Number.isInteger(number))) onChange(number);
       }} onBlur={commit} onKeyDown={(event) => { if (event.key === "Enter") event.currentTarget.blur(); }} />
   </label>;
 }
@@ -38,6 +38,7 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
   const activePresetKey = useBatchStore((state) => state.activePresetKey);
   const applyPreset = useBatchStore((state) => state.applyPreset);
   const useEditorStyle = useBatchStore((state) => state.useEditorStyle);
+  const fixedPadding = s.sizeMode === "original";
   const selectedPresetKey = activePresetKey === EDITOR_STYLE_KEY
     || BUILTIN_IMAGE_PRESETS.some((preset) => activePresetKey === `builtin:${preset.name}`)
     || saved.some((preset) => activePresetKey === `saved:${preset.id}`) ? activePresetKey ?? "" : "";
@@ -81,28 +82,28 @@ export default function BatchControls({ settings: s, onChange, onError }: { sett
     <section className="space-y-3 border-t border-zinc-800 pt-4">
       <h2 className="text-sm font-medium">{t("Canvas and position")}</h2>
       <select aria-label={t("Canvas size mode")} className={inputClass} value={s.sizeMode}
-        title={t("Match source aspect ratio uses each image's own proportions, with padding inside the canvas.")}
+        title={t(fixedPadding ? "Keep original pixels and add the same padding to all four sides. Frames are included before adding padding." : "Match source aspect ratio uses each image's own proportions, with padding inside the canvas.")}
         onChange={(event) => onChange({ sizeMode: event.target.value as BatchSettings["sizeMode"] })}>
         <option value="source-ratio">{t("Match source aspect ratio")}</option>
-        <option value="original">{t("Original image + padding")}</option><option value="fixed">{t("Fixed canvas size")}</option>
+        <option value="original">{t("Fixed pixel padding")}</option><option value="fixed">{t("Fixed canvas size")}</option>
       </select>
       {s.sizeMode === "fixed" && <><NumberField label={t("Width")} value={s.width} min={64} max={8192} onChange={(width) => onChange({ width })} />
         <NumberField label={t("Height")} value={s.height} min={64} max={8192} onChange={(height) => onChange({ height })} /></>}
-      <label className="block space-y-2 text-xs text-zinc-400" title={t("Canvas dimensions set the composition. Auto matches each source image; 1x exports the exact canvas dimensions.")}>
+      {!fixedPadding && <label className="block space-y-2 text-xs text-zinc-400" title={t("Canvas dimensions set the composition. Auto matches each source image; 1x exports the exact canvas dimensions.")}>
         <span>{t("Export resolution")}</span>
         <select aria-label={t("Export resolution")} className={inputClass} value={s.exportScale ?? "auto"} onChange={(event) => onChange({ exportScale: event.target.value === "auto" ? "auto" : Number(event.target.value) as ExportScale })}>
           <option value="auto">{t("High resolution (auto)")}</option>
           <option value="1">1x</option><option value="2">2x</option><option value="3">3x</option>
         </select>
-      </label>
-      <NumberField label={t("Padding")} value={s.padding} max={1024} onChange={(padding) => onChange({ padding })} />
-      <NumberField label={t("Image size (%)")} value={s.imageScale} min={10} max={100} onChange={(imageScale) => onChange({ imageScale })} />
+      </label>}
+      <NumberField label={t(fixedPadding ? "Padding per side (px)" : "Padding")} value={fixedPadding ? Math.round(s.padding) : s.padding} max={1024} integer={fixedPadding} onChange={(padding) => onChange({ padding })} />
+      {!fixedPadding && <><NumberField label={t("Image size (%)")} value={s.imageScale} min={10} max={100} onChange={(imageScale) => onChange({ imageScale })} />
       <div className="flex justify-between items-center gap-3"><span className="text-xs text-zinc-400">{t("Image position")}</span>
         <div className="grid grid-cols-3 gap-1" role="group" aria-label={t("Image position")}>{BATCH_POSITIONS.map((position) => <button type="button" key={position}
           aria-label={t(POSITION_LABELS[position])} title={t(POSITION_LABELS[position])} aria-pressed={s.position === position}
           onClick={() => onChange({ position })} className={`w-8 h-7 rounded border text-xs ${s.position === position ? "border-blue-400 bg-blue-500/20 text-blue-300" : "border-zinc-700 bg-zinc-800 text-zinc-500"}`}>●</button>)}</div>
-      </div>
-      <p className="text-[11px] text-zinc-500">{t("Images keep their proportions and fit inside the padding.")}</p>
+      </div></>}
+      <p className="text-[11px] text-zinc-500">{t(fixedPadding ? "Keep original pixels and add the same padding to all four sides. Frames are included before adding padding." : "Images keep their proportions and fit inside the padding.")}</p>
     </section>
     <section className="space-y-3 border-t border-zinc-800 pt-4">
       <h2 className="text-sm font-medium">{t("Image style")}</h2>

@@ -68,7 +68,7 @@ describe("batch export resolution", () => {
     expect(layout.imageWidth * output.scale).toBeCloseTo(1920);
   });
 
-  it.each(["fixed", "original"] as const)("preserves source detail after reducing image size in %s mode", (sizeMode) => {
+  it.each(["fixed", "source-ratio"] as const)("preserves source detail after reducing image size in %s mode", (sizeMode) => {
     const full = preset({ sizeMode, imageScale: 100 });
     const smaller = { ...full, imageScale: 50 };
     const output = batchExportResolution(1920, 1080, smaller);
@@ -84,6 +84,15 @@ describe("batch export resolution", () => {
     expect(batchExportResolution(641, 479, settings)).toEqual({
       scale: 1, width: layout.width, height: layout.height, limited: false, downsampled: false,
     });
+  });
+
+  it.each(["auto", 1, 2, 3] as const)("exports exact original pixels and padding regardless of a previous %s multiplier", (exportScale) => {
+    for (const [width, height] of [[1600, 900], [900, 1600], [80, 60]]) {
+      const settings = preset({ sizeMode: "original", padding: 100, imageScale: 40, position: "bottom-right", exportScale });
+      expect(batchExportResolution(width!, height!, settings)).toEqual({
+        scale: 1, width: width! + 200, height: height! + 200, limited: false, downsampled: false,
+      });
+    }
   });
 
   it("preserves deliberate 1x, 2x, and 3x canvas sizes and flags loss of source pixels", () => {

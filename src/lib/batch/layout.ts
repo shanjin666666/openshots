@@ -47,8 +47,11 @@ function frameBounds(imageWidth: number, imageHeight: number, settings: BatchSet
   // both bounds so even a device aligned against the canvas edge stays inside.
   const bodyWidth = device ? imageWidth / (1 - device.screenInset.left - device.screenInset.right) : frame.width;
   const bodyHeight = device ? imageHeight / (1 - device.screenInset.top - device.screenInset.bottom) : frame.height;
-  const outerWidth = Math.max(frame.width, bodyWidth);
-  const outerHeight = Math.max(frame.height, bodyHeight);
+  // Fractional device ratios can produce 1000.0000000000001 for a 1000 px
+  // body. Remove arithmetic noise before allocating its enclosing pixel box.
+  const stableExtent = (value: number) => Math.abs(value - Math.round(value)) < 1e-9 ? Math.round(value) : value;
+  const outerWidth = stableExtent(Math.max(frame.width, bodyWidth));
+  const outerHeight = stableExtent(Math.max(frame.height, bodyHeight));
   const border = !device && !chrome && settings.border.enabled ? settings.border.width : 0;
   const radius = device ? 0 : Math.min(settings.cornerRadius, imageWidth / 2, imageHeight / 2);
   return {
@@ -61,7 +64,10 @@ function frameBounds(imageWidth: number, imageHeight: number, settings: BatchSet
 }
 
 export function batchLayout(sourceWidth: number, sourceHeight: number, settings: BatchSettings) {
-  const { padding, imageScale, position } = settings;
+  const fixedPadding = settings.sizeMode === "original";
+  const padding = fixedPadding ? Math.round(settings.padding) : settings.padding;
+  const imageScale = fixedPadding ? 100 : settings.imageScale;
+  const position = fixedPadding ? "center" : settings.position;
   if (![sourceWidth, sourceHeight, settings.width, settings.height, padding, imageScale, settings.cornerRadius, settings.border.width].every(Number.isFinite)
       || sourceWidth <= 0 || sourceHeight <= 0 || padding < 0 || padding > 1024 || imageScale < 10 || imageScale > 100
       || settings.cornerRadius < 0 || settings.border.width < 0 || !BATCH_POSITIONS.includes(position)) {

@@ -2,6 +2,12 @@ import { batchMessages } from "./batch-messages";
 // English source messages are stable translation keys. Keep user content out of this catalog.
 export const zhCN: Record<string, string> = {
   ...batchMessages,
+  "Aspect ratio / custom": "比例 / 自定义",
+  "Padding on each side (px)": "每边扩展（px）",
+  "Use one image for fixed pixel padding, or batch processing for multiple images.": "固定像素扩边适用于单张图片；多张图片可使用批量美化。",
+  "The expanded image exceeds 8192 px per side or 32 megapixels. Reduce the padding.": "扩边后不能超过 8192 像素单边或 3200 万像素，请减小扩边数值。",
+  "Keep the original image pixels and add equal padding outside all four edges. Frames are included before padding.": "保持原图像素，向四周增加等宽背景。有外框时，从外框边缘向外扩展。",
+  "Fixed pixel padding exports at 1:1 to preserve the exact border width.": "固定按原始像素导出，保持设定的扩边宽度。",
   "Match source aspect ratio": "原图比例",
   "Add an image to use its aspect ratio.": "添加图片后，即可使用原图比例。",
   "This image aspect ratio exceeds the supported canvas dimensions.": "这张图片的比例超出支持的画布尺寸范围。",

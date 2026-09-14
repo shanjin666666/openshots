@@ -36,7 +36,7 @@ function addImageFromUrl(url: string) {
     const { canvasWidth, canvasHeight, images, addImage, setCanvasSize } = store;
 
     // Auto-adapt canvas to match image aspect ratio when first image is added
-    if (images.length === 0) {
+    if (images.length === 0 && store.canvasSizeMode !== "padding") {
       const imgRatio = img.naturalWidth / img.naturalHeight;
       // Keep the larger canvas dimension, adjust the other to match image ratio
       let newW = canvasWidth;

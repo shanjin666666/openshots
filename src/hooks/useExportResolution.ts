@@ -6,5 +6,6 @@ export function useExportResolution(choice: ExportScale) {
   const canvasWidth = useCanvasStore((s) => s.canvasWidth);
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const padding = useCanvasStore((s) => s.padding);
-  return editorExportResolution({ images, canvasWidth, canvasHeight, padding }, choice);
+  const canvasSizeMode = useCanvasStore((s) => s.canvasSizeMode);
+  return editorExportResolution({ images, canvasWidth, canvasHeight, padding, canvasSizeMode }, choice);
 }

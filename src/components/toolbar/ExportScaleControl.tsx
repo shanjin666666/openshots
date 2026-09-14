@@ -1,10 +1,16 @@
 import { t, useLocale } from "../../lib/i18n";
 import type { ExportResolution, ExportScale } from "../../lib/export-resolution";
+import { useCanvasStore } from "../../stores/canvas.store";
 
 export default function ExportScaleControl({ value, onChange, resolution }: {
   value: ExportScale; onChange: (value: ExportScale) => void; resolution: ExportResolution;
 }) {
   useLocale();
+  const fixedPadding = useCanvasStore((s) => s.canvasSizeMode === "padding");
+  if (fixedPadding) return <div className="space-y-2">
+    <p className="text-[11px] text-zinc-400">{t("Output:")} {resolution.width} × {resolution.height} px</p>
+    <p className="text-[11px] text-zinc-500">{t("Fixed pixel padding exports at 1:1 to preserve the exact border width.")}</p>
+  </div>;
   return <div className="space-y-2">
     <div className="flex flex-wrap gap-1" role="group" aria-label={t("Export resolution")}>
       {(["auto", 1, 2, 3] as const).map((choice) => <button key={choice} type="button" aria-pressed={value === choice}

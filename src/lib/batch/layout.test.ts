@@ -24,7 +24,7 @@ describe("batch placement", () => {
     }
   });
   it("uses the requested bottom-right position and includes the border", () => {
-    const config = settings(); config.position = "bottom-right"; config.imageScale = 50; config.border.enabled = true; config.border.width = 4;
+    const config = settings(); config.sizeMode = "fixed"; config.position = "bottom-right"; config.imageScale = 50; config.border.enabled = true; config.border.width = 4;
     const layout = batchLayout(400, 200, config);
     expect(layout.x + layout.imageWidth + 8).toBe(layout.width - 64);
     expect(layout.y + layout.imageHeight + 8).toBe(layout.height - 64);
@@ -34,7 +34,7 @@ describe("batch placement", () => {
     expect(batchLayout(20, 10, config).radius).toBe(5);
     expect(() => batchLayout(10000, 10000, config)).toThrow("limit");
     expect(() => batchLayout(100, 100, { ...config, sizeMode: "fixed", width: 64 })).toThrow("padding");
-    expect(() => batchLayout(100, 100, { ...config, imageScale: NaN })).toThrow("Invalid");
+    expect(() => batchLayout(100, 100, { ...config, sizeMode: "fixed", imageScale: NaN })).toThrow("Invalid");
   });
 });
 
@@ -45,6 +45,46 @@ const frames: NonNullable<BatchSettings["frame"]>[] = [
   { type: "device-mockup", variant: "ipad" },
   { type: "device-mockup", variant: "macbook" },
 ];
+
+describe("fixed pixel padding", () => {
+  it.each([[1600, 900], [900, 1600], [11, 7], [4001, 1001]])(
+    "adds exactly 100 px to all four sides of a %i × %i upload", (width, height) => {
+      const layout = batchLayout(width, height, { ...settings(), padding: 100, imageScale: 40, position: "bottom-right", exportScale: 3 });
+      expect(layout).toMatchObject({ width: width + 200, height: height + 200, imageWidth: width, imageHeight: height, x: 100, y: 100 });
+      expect(layout.width - layout.x - layout.outerWidth).toBe(100);
+      expect(layout.height - layout.y - layout.outerHeight).toBe(100);
+    },
+  );
+
+  it("keeps large padding intact for small uploads and normalizes fractional saved padding to pixels", () => {
+    const config = { ...settings(), padding: 1000 };
+    expect(batchLayout(80, 60, config)).toMatchObject({ width: 2080, height: 2060, imageWidth: 80, imageHeight: 60, x: 1000, y: 1000 });
+    expect(batchLayout(80, 60, { ...config, padding: 31.6 })).toMatchObject({ width: 144, height: 124, x: 32, y: 32 });
+  });
+
+  it.each(frames)("adds equal padding outside the entire $variant frame without scaling the upload", (frame) => {
+    const layout = batchLayout(641, 479, { ...settings(), frame, padding: 101, imageScale: 20, position: "bottom-right" });
+    expect(layout).toMatchObject({ imageWidth: 641, imageHeight: 479, x: 101, y: 101 });
+    expect(layout.width - layout.x - Math.ceil(layout.outerWidth)).toBe(101);
+    expect(layout.height - layout.y - Math.ceil(layout.outerHeight)).toBe(101);
+    expect(Number.isInteger(layout.x + layout.contentX)).toBe(true);
+    expect(Number.isInteger(layout.y + layout.contentY)).toBe(true);
+  });
+
+  it("adds padding around an enabled border and rejects oversized expansion instead of shrinking source pixels", () => {
+    const border = { enabled: true, width: 8, color: "#fff" };
+    expect(batchLayout(1600, 900, { ...settings(), padding: 100, border })).toMatchObject({ width: 1816, height: 1116, imageWidth: 1600, imageHeight: 900, x: 100, y: 100, contentX: 8, contentY: 8 });
+    expect(() => batchLayout(7992, 1000, { ...settings(), padding: 100 })).not.toThrow();
+    expect(() => batchLayout(7993, 1000, { ...settings(), padding: 100 })).toThrow("limit");
+    expect(() => batchLayout(7900, 3900, { ...settings(), padding: 100 })).toThrow("limit");
+  });
+
+  it("does not add a stray pixel when a device ratio evaluates just above a whole pixel", () => {
+    const layout = batchLayout(1600, 900, { ...settings(), padding: 100, frame: { type: "device-mockup", variant: "ipad" } });
+    expect(layout).toMatchObject({ outerHeight: 1000, height: 1200, y: 100 });
+    expect(layout.height - layout.y - layout.outerHeight).toBe(100);
+  });
+});
 
 describe("batch source aspect ratio", () => {
   it("uses each upload's own canvas proportions and keeps padding inside", () => {
@@ -188,6 +228,9 @@ describe("batch frames", () => {
     expect(() => batchLayout(8192, 100, { ...settings(), padding: 0, frame: frames[2] })).toThrow("limit");
     expect(() => batchLayout(8000, 4000, { ...settings(), padding: 0, frame: frames[0] })).toThrow("limit");
     expect(() => batchLayout(200, 100, { ...settings(), sizeMode: "fixed", width: 200, height: 32, padding: 0, frame: frames[1] })).toThrow("padding");
-    expect(() => batchLayout(200, 100, { ...settings(), sizeMode: "fixed", width: 200, height: 48, padding: 0, frame: frames[1], border: { enabled: true, width: 8, color: "#fff" } })).toThrow("padding");
+    const framed = { ...settings(), sizeMode: "fixed" as const, width: 200, height: 48, padding: 0, frame: frames[1] };
+    const layout = batchLayout(200, 100, { ...framed, border: { enabled: true, width: 8, color: "#fff" } });
+    expect(layout).toEqual(batchLayout(200, 100, { ...framed, border: { ...framed.border, enabled: false } }));
+    expect(layout).toMatchObject({ imageWidth: 32, imageHeight: 16, chromeHeight: 32, outerHeight: 48, border: 0 });
   });
 });

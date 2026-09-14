@@ -2,8 +2,9 @@ import { useCanvasStore, type CanvasImage, type CanvasState } from "../stores/ca
 import type { CanvasPreset } from "../stores/preset.store";
 import { resizeCanvasImages } from "./canvas-resize";
 import { imageDisplaySize, imageFrameSize } from "./image-geometry";
+import { fixedPaddingCanvas } from "./fixed-padding";
 
-type PresetSource = Pick<CanvasState, "canvasWidth" | "canvasHeight" | "padding" | "background" | "images" | "selectedId">;
+type PresetSource = Pick<CanvasState, "canvasWidth" | "canvasHeight" | "canvasSizeMode" | "padding" | "background" | "images" | "selectedId">;
 type PresetStyle = Pick<CanvasImage, "cornerRadius" | "shadow" | "insetBorder" | "frame">;
 
 /** Save reusable appearance, independently of the current screenshot contents. */
@@ -12,6 +13,7 @@ export function createCanvasPreset(state: PresetSource, name: string): CanvasPre
   return {
     id: crypto.randomUUID(), name: name.trim(),
     canvasWidth: state.canvasWidth, canvasHeight: state.canvasHeight, padding: state.padding,
+    canvasSizeMode: state.canvasSizeMode ?? "fixed",
     background: structuredClone(state.background),
     cornerRadius: image?.cornerRadius ?? 12,
     shadowEnabled: image?.shadow.enabled ?? true,
@@ -42,31 +44,42 @@ export function presetImageStyle(preset: Omit<CanvasPreset, "id">, image?: Pick<
   };
 }
 
-export function presetCanvasGeometry(preset: Pick<CanvasPreset, "canvasWidth" | "canvasHeight" | "padding">) {
+export function presetCanvasGeometry(preset: Pick<CanvasPreset, "canvasWidth" | "canvasHeight" | "canvasSizeMode" | "padding">) {
   const canvasWidth = Math.max(100, Math.round(preset.canvasWidth));
   const canvasHeight = Math.max(100, Math.round(preset.canvasHeight));
-  const padding = Math.max(0, Math.min(preset.padding, Math.floor(Math.min(canvasWidth, canvasHeight) / 4)));
-  return { canvasWidth, canvasHeight, padding };
+  const canvasSizeMode: "fixed" | "padding" = preset.canvasSizeMode === "padding" ? "padding" : "fixed";
+  const padding = canvasSizeMode === "padding"
+    ? Math.max(0, Math.min(1024, Math.round(preset.padding)))
+    : Math.max(0, Math.min(preset.padding, Math.floor(Math.min(canvasWidth, canvasHeight) / 4)));
+  return { canvasWidth, canvasHeight, canvasSizeMode, padding };
 }
 
 /** Apply size and appearance together so one undo restores the entire canvas. */
 export function applyCanvasPreset(preset: Omit<CanvasPreset, "id">): void {
-  useCanvasStore.setState((state) => {
-    const { canvasWidth, canvasHeight, padding } = presetCanvasGeometry(preset);
-    const styledImages = state.images.map((image) => ({ ...image, ...presetImageStyle(preset, image) }));
-    const sizeChanged = state.canvasWidth !== canvasWidth || state.canvasHeight !== canvasHeight || state.padding !== padding;
-    const frameChanged = styledImages.some((image, index) => {
-      const before = state.images[index]!;
-      const display = imageDisplaySize(before, state.canvasWidth, state.canvasHeight, state.padding);
-      const oldFrame = imageFrameSize(before, display.width, display.height);
-      const newFrame = imageFrameSize(image, display.width, display.height);
-      return oldFrame.width !== newFrame.width || oldFrame.height !== newFrame.height;
-    });
-    const images = sizeChanged || frameChanged
-      ? resizeCanvasImages(styledImages,
-        { width: state.canvasWidth, height: state.canvasHeight, padding: state.padding },
-        { width: canvasWidth, height: canvasHeight, padding }, state.imageLayout)
-      : styledImages;
-    return { canvasWidth, canvasHeight, padding, background: structuredClone(preset.background), images };
+  const state = useCanvasStore.getState();
+  const styledImages = state.images.map((image) => ({ ...image, ...presetImageStyle(preset, image) }));
+  const { canvasWidth, canvasHeight, canvasSizeMode, padding } = presetCanvasGeometry(state.images.length > 1
+    ? { ...preset, canvasSizeMode: "fixed" } : preset);
+  if (canvasSizeMode === "padding" && state.images.length === 1) {
+    const expanded = fixedPaddingCanvas({ ...state, images: styledImages }, padding, state.images);
+    // A source that cannot fit at native resolution leaves the whole preset unapplied.
+    if (!expanded) return;
+    useCanvasStore.setState({ ...expanded, canvasSizeMode, background: structuredClone(preset.background) });
+    return;
+  }
+  const sizeChanged = state.canvasWidth !== canvasWidth || state.canvasHeight !== canvasHeight || state.padding !== padding
+    || (state.canvasSizeMode ?? "fixed") !== canvasSizeMode;
+  const frameChanged = styledImages.some((image, index) => {
+    const before = state.images[index]!;
+    const display = imageDisplaySize(before, state.canvasWidth, state.canvasHeight, state.padding);
+    const oldFrame = imageFrameSize(before, display.width, display.height);
+    const newFrame = imageFrameSize(image, display.width, display.height);
+    return oldFrame.width !== newFrame.width || oldFrame.height !== newFrame.height;
   });
+  const images = sizeChanged || frameChanged
+    ? resizeCanvasImages(styledImages,
+      { width: state.canvasWidth, height: state.canvasHeight, padding: state.padding },
+      { width: canvasWidth, height: canvasHeight, padding }, state.imageLayout)
+    : styledImages;
+  useCanvasStore.setState({ canvasWidth, canvasHeight, canvasSizeMode, padding, background: structuredClone(preset.background), images });
 }

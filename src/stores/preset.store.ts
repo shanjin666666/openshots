@@ -8,6 +8,7 @@ export interface CanvasPreset {
   name: string;
   canvasWidth: number;
   canvasHeight: number;
+  canvasSizeMode?: "fixed" | "padding";
   padding: number;
   background: CanvasBackground;
   cornerRadius: number;

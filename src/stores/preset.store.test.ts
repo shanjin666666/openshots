@@ -95,6 +95,7 @@ describe("saved style presets", () => {
   it("restores renamed presets and all style details from persisted JSON after a restart", async () => {
     const store = await loadStore();
     const framed = preset("framed");
+    framed.canvasSizeMode = "padding";
     const noFrame = { ...preset("unframed"), frame: null };
     store.getState().addPreset(framed);
     store.getState().addPreset(noFrame);

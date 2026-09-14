@@ -5,6 +5,7 @@ import { useCanvasStore } from "../../stores/canvas.store";
 import { useToolStore, COLOR_PRESETS } from "../../stores/tool.store";
 import { extractDominantColor } from "../../lib/colorAnalysis";
 import AutoLayoutControls from "./AutoLayoutControls";
+import { FixedPaddingField } from "../panels/FixedPaddingControls";
 
 function Section({ title, defaultOpen = true, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const [open, setOpen] = useState(defaultOpen);
@@ -116,10 +117,11 @@ function ImageControls({
   onAutoInsetBorder: () => void;
 }) {
   useLocale();
+  const fixedPadding = useCanvasStore((s) => s.canvasSizeMode === "padding");
   return (
     <>
       {/* Padding */}
-      <div className="flex items-center gap-2">
+      {fixedPadding ? <FixedPaddingField /> : <div className="flex items-center gap-2">
         <label className="text-[11px] text-zinc-500 w-12">{t("Padding")}</label>
         <input
           type="range"
@@ -133,7 +135,7 @@ function ImageControls({
         <span className="text-[11px] text-zinc-500 w-7 text-right">
           {padding}
         </span>
-      </div>
+      </div>}
 
       {/* Corner radius */}
       <div className="flex items-center gap-2">

@@ -26,6 +26,7 @@ function fillDefaults(partial: Partial<CanvasPreset>): CanvasPreset {
     name: partial.name ?? t("Imported Preset"),
     canvasWidth: partial.canvasWidth ?? 1280,
     canvasHeight: partial.canvasHeight ?? 960,
+    canvasSizeMode: partial.canvasSizeMode === "padding" ? "padding" : "fixed",
     padding: partial.padding ?? 64,
     background: partial.background ?? {
       type: "solid" as const,

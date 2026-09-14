@@ -34,7 +34,7 @@ export function exportResolution(canvasWidth: number, canvasHeight: number, sour
 }
 
 /** Keep the composition, increasing output pixels to match the placed source images. */
-export function editorExportResolution(state: Pick<CanvasState, "images" | "canvasWidth" | "canvasHeight" | "padding">, choice: ExportScale = "auto") {
+export function editorExportResolution(state: Pick<CanvasState, "images" | "canvasWidth" | "canvasHeight" | "padding" | "canvasSizeMode">, choice: ExportScale = "auto") {
   const { images, canvasWidth, canvasHeight, padding } = state;
   let sourceScale = 1;
   for (const image of images) {
@@ -42,5 +42,5 @@ export function editorExportResolution(state: Pick<CanvasState, "images" | "canv
     const ratio = Math.max((image.naturalWidth || image.width) / display.width, (image.naturalHeight || image.height) / display.height);
     if (Number.isFinite(ratio)) sourceScale = Math.max(sourceScale, ratio);
   }
-  return exportResolution(canvasWidth, canvasHeight, sourceScale, choice);
+  return exportResolution(canvasWidth, canvasHeight, sourceScale, state.canvasSizeMode === "padding" ? 1 : choice);
 }

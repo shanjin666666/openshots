@@ -26,6 +26,7 @@ export interface ProjectFile {
   canvas: {
     width: number;
     height: number;
+    sizeMode?: "fixed" | "padding";
     padding: number;
     background: CanvasBackground;
     imageLayout?: ImageLayoutSettings | null;
@@ -52,6 +53,7 @@ export function serializeProject(): ProjectFile {
     canvas: {
       width: state.canvasWidth,
       height: state.canvasHeight,
+      sizeMode: state.canvasSizeMode ?? "fixed",
       padding: state.padding,
       background: state.background,
       imageLayout: state.imageLayout,
@@ -201,6 +203,7 @@ export function loadProject(projectFile: ProjectFile, filePath: string): void {
   useCanvasStore.setState({
     canvasWidth: projectFile.canvas.width,
     canvasHeight: projectFile.canvas.height,
+    canvasSizeMode: projectFile.canvas.sizeMode === "padding" ? "padding" : "fixed",
     padding: projectFile.canvas.padding,
     background: projectFile.canvas.background,
     images: projectFile.images,

@@ -6,6 +6,7 @@ import { applyCanvasPreset } from "../../lib/canvas-presets";
 import SavedPresetManager from "../presets/SavedPresetManager";
 import { ASPECT_RATIOS, canvasSize } from "../../lib/aspectRatios";
 import SourceAspectRatioButton from "../panels/SourceAspectRatioButton";
+import FixedPaddingControls from "../panels/FixedPaddingControls";
 import { open } from "@tauri-apps/plugin-dialog";
 import { readImageFile, listSystemWallpapers, convertHeicThumbnail, convertHeicToDataUrl, type SystemWallpaper } from "../../ipc/capture";
 import { ChevronDown, ChevronRight } from "lucide-react";
@@ -65,6 +66,7 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
   const canvasHeight = useCanvasStore((s) => s.canvasHeight);
   const setCanvasSize = useCanvasStore((s) => s.setCanvasSize);
   const padding = useCanvasStore((s) => s.padding);
+  const fixedPadding = useCanvasStore((s) => s.canvasSizeMode === "padding");
   const setPadding = useCanvasStore((s) => s.setPadding);
 
   const [wallpapers, setWallpapers] = useState<(SystemWallpaper & { thumb?: string })[]>([]);
@@ -83,7 +85,7 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
     setHeightInput(String(canvasHeight));
     if (debounceRef.current) clearTimeout(debounceRef.current);
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
-  }, [canvasWidth, canvasHeight]);
+  }, [canvasWidth, canvasHeight, fixedPadding]);
 
   const resizeCanvas = (width: number, height: number) => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -187,6 +189,8 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
     <div className="p-4 space-y-5">
       {/* Canvas Size */}
       <Section title={t("Canvas Size")} defaultOpen>
+        <FixedPaddingControls beforeChange={() => { if (debounceRef.current) clearTimeout(debounceRef.current); }} />
+        {!fixedPadding && <>
         <p className="text-[11px] leading-relaxed text-zinc-500">{t("Images automatically fit when the canvas size or aspect ratio changes.")}</p>
         {/* Aspect ratio buttons */}
         <div className="grid grid-cols-3 gap-1">
@@ -247,6 +251,7 @@ export default function BackgroundProperties({ active }: { active: boolean }) {
           />
           <span className="text-[11px] text-zinc-500 w-7 text-right">{padding}</span>
         </div>
+        </>}
       </Section>
 
       {/* Presets */}

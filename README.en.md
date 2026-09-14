@@ -111,9 +111,10 @@ npx tauri build
 Open **Batch beautify** (批量美化), add multiple PNG/JPEG/WebP/BMP images, then choose a style and an output folder. Each source becomes a separate PNG or high-quality JPEG. Preview any item before exporting; the preview uses the same rendering path as the full-size output.
 
 - Share built-in and saved presets with the single-image editor. Applying a preset uses its canvas size, background, padding, corners, shadow, border and frame, or copy the editor's current style directly.
-- Keep each original image's pixel dimensions plus padding, or fit every image to a fixed canvas. Choose one of nine positions and adjust image size without stretching or cropping.
+- **Fixed pixel padding** keeps each source at its original pixel dimensions and adds the same integer padding to all four sides. A 1600 × 900 image with 100 px per side exports as 1800 × 1100. Set it under **Background → Canvas Size** in the editor or **Canvas & placement** in batch, and save it in presets. When a frame is enabled, padding extends outside the frame.
+- Fixed-canvas and source-aspect-ratio modes support nine positions and image-size adjustment without stretching or cropping.
 - **Match source aspect ratio** gives each upload a canvas with its own proportions and padding inside. The editor also offers this option under Canvas Size, using the selected image's original ratio or the first image when none is selected.
-- **High resolution (auto)** is the default: canvas dimensions define the composition, while output pixels match each source to preserve its detail. The preview header shows actual output dimensions. Choose 1x, 2x, or 3x when every output must have the same exact dimensions.
+- Aspect-ratio and custom-size modes default to **High resolution (auto)**: canvas dimensions define the composition, while output pixels match each source to preserve its detail. The preview header shows actual output dimensions. Choose 1x, 2x, or 3x when every output must have the same exact dimensions. Fixed pixel padding always exports at 1:1 to keep border widths exact.
 - Files are named `original-styled.png` (or `.jpg`), with numeric suffixes on collisions. Originals and existing files are never overwritten.
 - Processing is sequential to limit memory use. Stop between images, inspect individual failures, and retry failed items. Successfully written images are retained when stopping.
 - Each output is limited to 32 megapixels and 8192 pixels per side. Batch settings and file selections are retained while navigating within the current app session.

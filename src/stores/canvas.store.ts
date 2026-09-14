@@ -2,6 +2,7 @@ import { create } from "zustand";
 import { temporal } from "zundo";
 import { computeImageLayout, type ImageLayout, type LayoutSpacing, type ImageLayoutSettings } from "../lib/image-layout";
 import { resizeCanvasImages } from "../lib/canvas-resize";
+import { fixedPaddingCanvas } from "../lib/fixed-padding";
 
 // ---------- Types ----------
 
@@ -172,6 +173,7 @@ export interface CanvasState {
   // Canvas dimensions
   canvasWidth: number;
   canvasHeight: number;
+  canvasSizeMode?: "fixed" | "padding";
 
   // Padding around images
   padding: number;
@@ -197,6 +199,7 @@ interface CanvasActions {
   // Canvas
   setCanvasSize: (width: number, height: number) => void;
   setPadding: (padding: number) => void;
+  setFixedPadding: (padding: number) => boolean;
 
   // Background
   setBackground: (bg: Partial<CanvasBackground>) => void;
@@ -242,6 +245,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
     (set, get) => ({
       canvasWidth: 1920,
       canvasHeight: 1080,
+      canvasSizeMode: "fixed",
       padding: 64,
       background: DEFAULT_BACKGROUND,
       images: [],
@@ -254,34 +258,62 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
         if (!Number.isFinite(width) || !Number.isFinite(height)) return;
         const state = get();
         const canvasWidth = Math.max(100, Math.round(width)), canvasHeight = Math.max(100, Math.round(height));
-        if (canvasWidth === state.canvasWidth && canvasHeight === state.canvasHeight) return;
+        if (canvasWidth === state.canvasWidth && canvasHeight === state.canvasHeight && state.canvasSizeMode !== "padding") return;
         const padding = Math.min(state.padding, Math.floor(Math.min(canvasWidth, canvasHeight) / 4));
         const images = resizeCanvasImages(state.images,
           { width: state.canvasWidth, height: state.canvasHeight, padding: state.padding },
           { width: canvasWidth, height: canvasHeight, padding }, state.imageLayout);
-        set({ canvasWidth, canvasHeight, padding, images });
+        set({ canvasWidth, canvasHeight, padding, images, canvasSizeMode: "fixed" });
       },
       setPadding: (value) => {
         if (!Number.isFinite(value)) return;
         const state = get();
+        if (state.canvasSizeMode === "padding") {
+          state.setFixedPadding(value);
+          return;
+        }
         const padding = Math.max(0, Math.min(value, Math.floor(Math.min(state.canvasWidth, state.canvasHeight) / 4)));
         if (padding === state.padding) return;
         const size = { width: state.canvasWidth, height: state.canvasHeight };
         const images = resizeCanvasImages(state.images, { ...size, padding: state.padding }, { ...size, padding }, state.imageLayout);
         set({ padding, images });
       },
+      setFixedPadding: (padding) => {
+        const state = get();
+        if (!state.images.length && Number.isFinite(padding) && padding >= 0 && padding <= 1024) {
+          set({ canvasSizeMode: "padding", padding: Math.round(padding) });
+          return true;
+        }
+        const expanded = fixedPaddingCanvas(state, padding);
+        if (!expanded) return false;
+        set(expanded);
+        return true;
+      },
 
       setBackground: (bg) =>
         set((s) => ({ background: { ...s.background, ...bg } })),
 
-      addImage: (image) => set((s) => ({ images: [...s.images, image], imageLayout: null })),
-      updateImage: (id, updates) =>
-        set((s) => ({
-          images: s.images.map((img) =>
-            img.id === id ? { ...img, ...updates } : img,
-          ),
-          imageLayout: (["x", "y", "width", "height", "rotation"] as const).some((key) => key in updates) ? null : s.imageLayout,
-        })),
+      addImage: (image) => set((s) => {
+        const images = [...s.images, image];
+        if (s.canvasSizeMode === "padding") {
+          return fixedPaddingCanvas({ ...s, images }, s.padding) ?? { images, imageLayout: null, canvasSizeMode: "fixed" };
+        }
+        return { images, imageLayout: null };
+      }),
+      updateImage: (id, updates) => {
+        const s = get();
+        const images = s.images.map((img) => img.id === id ? { ...img, ...updates } : img);
+        const transformed = (["x", "y", "width", "height", "rotation"] as const).some((key) => key in updates);
+        const sourceChanged = "src" in updates || "naturalWidth" in updates || "naturalHeight" in updates;
+        if (s.canvasSizeMode === "padding" && (sourceChanged || "frame" in updates || "insetBorder" in updates)) {
+          const expanded = fixedPaddingCanvas({ ...s, images }, s.padding,
+            sourceChanged && transformed ? images : s.images);
+          if (expanded) set(expanded);
+          return;
+        }
+        set({ images, imageLayout: transformed ? null : s.imageLayout,
+          ...(transformed ? { canvasSizeMode: "fixed" as const } : {}) });
+      },
       applyImageLayout: (layout, spacing) => {
         const state = get();
         if (state.images.length < 2) return;
@@ -398,6 +430,7 @@ export const useCanvasStore = create<CanvasState & CanvasActions>()(
       partialize: (state) => ({
         canvasWidth: state.canvasWidth,
         canvasHeight: state.canvasHeight,
+        canvasSizeMode: state.canvasSizeMode,
         padding: state.padding,
         background: state.background,
         images: state.images,

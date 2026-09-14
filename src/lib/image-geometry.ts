@@ -24,7 +24,8 @@ export function imageFrameSize(image: Pick<CanvasImage, "frame" | "insetBorder">
       top: Math.round(totalHeight * inset.top), bottom: Math.round(totalHeight * inset.bottom),
     };
   }
-  const border = image.insetBorder.enabled ? image.insetBorder.width : 0;
+  // Window/device frames replace the inset border in the renderer.
+  const border = !image.frame && image.insetBorder.enabled ? image.insetBorder.width : 0;
   return {
     chromeHeight, deviceInsets,
     width: width + (deviceInsets ? deviceInsets.left + deviceInsets.right : border * 2),
